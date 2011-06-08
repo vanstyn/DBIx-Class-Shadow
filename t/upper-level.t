@@ -58,7 +58,6 @@
 }
 
 {
-{
   package DBIC::ShadowTest::Config;
 
   use warnings;
@@ -97,6 +96,13 @@
   use strict;
 
   use base qw/DBIx::Class::Shadow::DefaultChangeset/; # this adds an id and a datestamp I guess?
+  sub new {
+     my ($class, $args, @rest) = @_;
+
+     # munge args here
+
+     $class->next::method($args, @rest);
+  }
 
   __PACKAGE__->table('changeset');
 
@@ -118,19 +124,8 @@
 
   __PACKAGE__->shadow_result_base_class( 'DBIC::ShadowTest::Result' );
   __PACKAGE__->shadow_changeset_result( 'DBIC::ShadowTest::Result::Changeset' );
-  __PACKAGE__->shadow_changeset_do(sub {
-     my ($changeset, $data, $coderef) = @_;
 
-     $changeset->user_id($data->{user_id}) if exists $data->{user_id};
-     $changeset->session_id($data->{session_id}) if exists $data->{user_id};
-     $changeset->caller($data->{caller} || scalar caller); # this is a stupid idea
-     $coderef->();
-  });
-
-  __PACKAGE__->register_class( Artist => 'DBIC::ShadowTest::Artist' );
-  __PACKAGE__->register_class( CD => 'DBIC::ShadowTest::CD' );
-  __PACKAGE__->register_class( Track => 'DBIC::ShadowTest::Track' );
-  __PACKAGE__->register_class( Painting => 'DBIC::ShadowTest::Painting' );
+  __PACKAGE__->register_class( Changeset => 'DBIC::ShadowTest::Changeset' );
   __PACKAGE__->register_class( Config => 'DBIC::ShadowTest::Config' );
 }
 
