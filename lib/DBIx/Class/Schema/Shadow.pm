@@ -93,7 +93,7 @@ sub _gen_shadow_source {
     }
 
     my $shadow_cols;
-    for (@{$res_class->shadow_columns || [ $res_class->columns ]}) {
+    for (@{$res_class->shadow_columns}) {
       my $inf = $columns_info->{$_} || $self->throw_exception (
         "Unable to shadow nonexistent column '$_' on $res_class"
       );
@@ -105,8 +105,8 @@ sub _gen_shadow_source {
 
     $shadow_class->add_columns(
       shadow_id => { data_type => 'BIGINT', is_auto_increment => 1 },
-      shadow_timestamp => { data_type => 'BIGINT' }, # sprintf "%d%06d\n", Time::HiRes::gettimeofday()
-      shadowed_lifecycle => { data_type => 'BIGINT' },
+      shadow_timestamp => { data_type => 'BIGINT' }, # sprintf "%d%06d", Time::HiRes::gettimeofday()
+      shadowed_lifecycle => { data_type => 'BIGINT', retrieve_on_insert => 1 },
       (map {( "shadowed_curpk_$_" => { %{$columns_info->{$_}}, is_nullable => 1 } )} @pks),
       $self->_sort_colhash( { map
         {( "shadow_val_$_" => { accessor => $_, %{$shadow_cols->{$_}} } )}
@@ -198,10 +198,24 @@ sub _gen_shadow_relationship {
 
     # simple foreign lifecycle-based relation - add the foreign col if necessary and declare the rel
     my $foreign_id_col = 'rel_' . $foreign_shadow->table . '_lifecycle';
-    $our_shadow->add_column(
-      $foreign_id_col => { data_type => 'BIGINT' }
-    ) unless $our_shadow->has_column ($foreign_id_col);
-    $shadow_rel_cond = { 'foreign.lifecycle' => "self.${foreign_id_col}" };
+    my $optional_belongs_to = ($relinfo->{attrs}{join_type}||'') =~ /^left/i;
+
+    unless ($our_shadow->has_column ($foreign_id_col)) {
+      $our_shadow->add_column(
+        $foreign_id_col => { data_type => 'BIGINT', is_nullable => $optional_belongs_to ? 1 : 0 }
+      );
+      $self->_reapply_source_prototype($our_shadow->result_source_instance);
+    }
+
+    $shadow_rel_cond = { 'foreign.shadowed_lifecycle' => "self.${foreign_id_col}" };
+
+    # ensure that we always know whether or the belongs_to is actually there
+    if ($optional_belongs_to) {
+      for (values %$stripped_cond) {
+        $rsrc->add_columns( ('+' . $_) => { retrieve_on_insert => 1 } );
+      }
+      $self->_reapply_source_prototype($rsrc);
+    }
   }
   else {
     my $rev_cond = { reverse %$stripped_cond };
@@ -212,14 +226,23 @@ sub _gen_shadow_relationship {
 
     # simple local lifecycle-based relation - add the foreign col to the other side if necessary and declare the rel
     my $our_id_fk_col = 'rel_' . $our_shadow->table . '_lifecycle';
-    $foreign_shadow->add_column(
-      $our_id_fk_col => { data_type => 'BIGINT' }
-    ) unless $foreign_shadow->has_column ($our_id_fk_col);
-    $shadow_rel_cond = { "foreign.${our_id_fk_col}" => 'self.lifecycle' };
+
+    unless ($foreign_shadow->has_column ($our_id_fk_col)) {
+      $foreign_shadow->add_column(
+        $our_id_fk_col => { data_type => 'BIGINT' }
+      );
+      $self->_reapply_source_prototype($foreign_shadow->result_source_instance);
+    }
+
+    $shadow_rel_cond = { "foreign.${our_id_fk_col}" => 'self.shadowed_lifecycle' };
   }
 
   # do not deploy any FK constraints
-  $our_shadow->has_many("${rel}_shadows" => $foreign_shadow, $shadow_rel_cond, { is_foreign_key_constraint => 0 });
+  $our_shadow->has_many("${rel}_shadows" => $foreign_shadow, $shadow_rel_cond, {
+    is_foreign_key_constraint => 0,
+    is_foreign => $relinfo->{attrs}{is_foreign},  # inherit this so we have a sense of direction
+    shadows_original_relname => $rel,
+  });
 }
 
 # when some changes are made to a source we want to find its

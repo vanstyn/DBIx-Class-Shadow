@@ -115,6 +115,26 @@ sub update {
         if ($update_actions->{$rel} eq 'set null') {
           $new_cond->{$_} = undef for keys %$new_cond
         }
+        else {
+          my $self_rs;
+          for my $col (keys %$new_cond) {
+            # if we got a literal we have no idea what it could be containing
+            # (maybe a value, but maybe an expression based on some jointable)
+            # replace with direct query
+            # FIXME - perhaps need to update $self with the fetched value while we are here?
+            if(
+              ref $new_cond->{$col} eq 'SCALAR'
+                or
+              (ref $new_cond->{$col} eq 'REF' and ref ${$new_cond->{$col}} eq 'ARRAY')
+            ) {
+              $new_cond->{$col}
+                = ($self_rs ||= $rsrc->resultset->search($self->ident_condition))
+                    ->get_column($col)
+                     ->as_query
+              ;
+            }
+          }
+        }
 
         $rel_rs->update_all($new_cond);
       }
