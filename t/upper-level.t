@@ -2,6 +2,11 @@
   package DBIC::ShadowTest::Result;
   use base qw/DBIx::Class::Core/;
 
+  __PACKAGE__->load_components('Shadow::Rels');
+
+  # add's a belongs_tos (or has_ones?) called 'next' and 'previous' pointing to the other versions for this result
+  __PACKAGE__->define_next_rel;
+  __PACKAGE__->define_previous_rel;
   # we need some attr to unambiguously identify the direction of a relation
   # is_foreign_key_constraint is already taken to mean "create/do not create a
   # real constraint on deploy()" so instead I am making up a new one. We need
