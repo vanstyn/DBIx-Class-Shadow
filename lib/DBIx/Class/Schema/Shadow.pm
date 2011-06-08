@@ -106,6 +106,7 @@ sub _gen_shadow_source {
     $shadow_class->add_columns(
       shadow_id => { data_type => 'BIGINT', is_auto_increment => 1 },
       shadow_timestamp => { data_type => 'BIGINT' }, # sprintf "%d%06d", Time::HiRes::gettimeofday()
+      shadow_stage => { data_type => 'TINYINT' }, # 2 - new insert, 1 - update, 0 - deletion
       shadowed_lifecycle => { data_type => 'BIGINT', retrieve_on_insert => 1 },
       (map {( "shadowed_curpk_$_" => { %{$columns_info->{$_}}, is_nullable => 1 } )} @pks),
       $self->_sort_colhash( { map

@@ -25,16 +25,24 @@ sub shadow_columns {
 }
 
 sub _instantiate_shadow_row {
-  my ($self, $lifecycle) = @_;
+  my ($self, $stage, $lifecycle) = @_;
 
   # we need to set our own lifecycle and also retrieve related lifecycles via
   # the main object relationships
   my $rsrc = $self->result_source;
+  my $schema = $rsrc->schema;
   my $shadow_rsrc = $rsrc->related_source($shadows_rel);
+
+  # this is so a multi-operation appears to have happened at the same time
+  # (maybe this is a bad idea)
+  # (( but it rocks for testing ))
+  local $schema->{_shadow_changeset_timestamp} = sprintf ("%d%06d", gettimeofday())
+    unless $schema->{_shadow_changeset_timestamp};
 
   my $self_rs;
   my $new_shadow = $self->new_related($shadows_rel, {
     shadow_timestamp => $rsrc->schema->{_shadow_changeset_timestamp},
+    shadow_stage => $stage,
     shadowed_lifecycle => $lifecycle || \ sprintf(
       '( SELECT COALESCE( MAX( shadowed_lifecycle ), 0 ) + 1 FROM %s)',
       $shadow_rsrc->name,
@@ -68,12 +76,17 @@ sub _instantiate_shadow_row {
       $local_col =~ s/^self\.//
         or $self->throw_exception("Unexpected relationship fk name '$local_col'");
 
-      $new_shadow->$local_col(
-        $self
-          ->search_related($real_rel)
-           ->search_related($shadows_rel, {}, { rows => 1 })
-            ->get_column('shadowed_lifecycle')
-             ->as_query
+      $new_shadow->$local_col($lifecycle
+        ? $shadow_rsrc
+            ->resultset
+             ->search({ shadowed_lifecycle => { '=', $lifecycle } }, { rows => 1 })
+              ->get_column($local_col)
+               ->as_query
+        : $self
+            ->search_related($real_rel)
+             ->search_related($shadows_rel, {}, { rows => 1 })
+              ->get_column('shadowed_lifecycle')
+               ->as_query
       );
     }
   }
@@ -86,25 +99,17 @@ sub insert{
   my $rsrc = $self->result_source;
   my $schema = $rsrc->schema;
 
-  my $is_top_level = !$schema->{_shadow_changeset_rows};
+  my $guard = $schema->txn_scope_guard
+    unless $schema->{_shadow_changeset_rows};
 
   local $schema->{_shadow_changeset_rows} = []
-    if $is_top_level;
-
-  my $guard = $schema->txn_scope_guard
-    if $is_top_level;
-
-  # this is so a multi-operation appears to have happened at the same time
-  # (maybe this is a bad idea)
-  # (( but it rocks for testing ))
-  local $schema->{_shadow_changeset_timestamp} = sprintf ("%d%06d", gettimeofday())
-    unless $schema->{_shadow_changeset_timestamp};
+    if $guard;
 
   # do the actual insert - it *may* recurse in the case of Rekey/MC - the resulting
   # shadows will accumulate in _shadow_changeset_rows, and will only insert at the end
   $self->next::method(@_);
 
-  push @{$schema->{_shadow_changeset_rows}}, $self->_instantiate_shadow_row;
+  push @{$schema->{_shadow_changeset_rows}}, $self->_instantiate_shadow_row(2);
 
   if ($guard) {
     # MC descends to create all objects first, and inserts them later, so our
@@ -132,13 +137,11 @@ sub update {
 
   my $guard = $schema->txn_scope_guard;
 
-  local $schema->{_shadow_changeset_timestamp} = sprintf ("%d%06d", gettimeofday())
-    unless $schema->{_shadow_changeset_timestamp};
-
   # do the actual update
   $self->next::method(@_);
 
   $self->_instantiate_shadow_row(
+    1,
     $rsrc->resultset
           ->search($self->ident_condition)
            ->search_related($shadows_rel, {}, { rows => 1 })
@@ -151,7 +154,37 @@ sub update {
   $self;
 }
 
-# TODO (it almost works on its own anyway)
-sub delete { shift->next::method(@_) }
+sub delete {
+  my $self = shift;
+
+  my $storage_ident_cond = $self->_storage_ident_condition;
+  my $rsrc = $self->result_source;
+
+  my $guard = $rsrc->schema->txn_scope_guard;
+
+  ### FIXME FIXME FIXME
+  ### This only works because we do not have sqlite-side cascading
+  ### dlete() will not be called on rows that are deleted by rdbms
+  ### side triggers, we need to walk the tree ourselves *before*
+  ### we issue the 1st delete
+  ### Even then - if we do not shadow a particular "master" table
+  ### the rdbms-side cascade will go all the way and this code
+  ### won't be called at all. Not sure what's sensible...
+  # "deleted" shadow - do it before it is "disappeared"
+  $self->_instantiate_shadow_row(
+    0,
+    $rsrc->resultset
+      ->search($self->_storage_ident_condition) # object may be dirty
+       ->search_related($shadows_rel, {}, { rows => 1 })
+        ->get_column('shadowed_lifecycle')
+         ->as_query
+  )->insert;
+
+  $self->next::method(@_);
+
+  $guard->commit;
+
+  $self;
+}
 
 1;
