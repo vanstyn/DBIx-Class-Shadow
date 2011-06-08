@@ -159,4 +159,17 @@ $s->changeset_do({ user => 1, session => 4, caller => 'this_would_be_dumb' }, su
    $level->update({ value => 'DEBUG' });
 });
 
+# shadow resultset methods:
+#   before
+#     Takes datetime object or a string
+#     reverse sort
+#   after
+#     Takes datetime object or a string
+#
+#   next
+#     Takes an int and defaults to 1
+#   previous
+#     Takes an int and defaults to 1
+#     reverses sort
+
 done_testing;
