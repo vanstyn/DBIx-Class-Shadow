@@ -2,7 +2,9 @@
   package DBIC::ShadowTest::Result;
   use base qw/DBIx::Class::Core/;
 
-  __PACKAGE__->load_components('Shadow::Rels');
+  __PACKAGE__->load_components(qw(Shadow::Rels Shadow::Delta));
+
+  # method as_delta { $self->delta_class->new($self->previous->get_inflated_columns, $self->get_inflated_columns) }
 
   # add's a belongs_tos (or has_ones?) called 'next' and 'previous' pointing to the other versions for this result
   __PACKAGE__->define_next_rel;
