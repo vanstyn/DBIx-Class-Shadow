@@ -64,7 +64,14 @@
   use strict;
 
   use base qw/DBIC::ShadowTest::Result/;
-  __PACKAGE__->load_components(qw/Shadow/);
+  __PACKAGE__->load_components(qw/Shadow Shadow::Rels/);
+
+  # add's a has_many called 'versions' pointing to the other versions for this result
+  # optional args:
+  # {
+  #    name => 'versions',
+  # }
+  __PACKAGE__->define_versions_rel;
 
   __PACKAGE__->shadow_columns([qw/id key value/]);
 
