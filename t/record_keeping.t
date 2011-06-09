@@ -83,6 +83,13 @@
 }
 
 {
+  package DBIC::ShadowTest::ShadowResult;
+
+  use base qw/DBIC::ShadowTest::Result DBIx::Class::Shadow::Row/;
+}
+
+
+{
   package DBIC::ShadowTest::Artist;
 
   use warnings;
@@ -192,6 +199,7 @@
   __PACKAGE__->position_column('position');
 }
 
+
 {
   package DBIC::ShadowTest;
 
@@ -201,7 +209,7 @@
   use base qw/DBIx::Class::Schema/;
   __PACKAGE__->load_components(qw/Schema::Shadow/);
 
-  __PACKAGE__->shadow_result_base_class( 'DBIC::ShadowTest::Result' );
+  __PACKAGE__->shadow_result_base_class( 'DBIC::ShadowTest::ShadowResult' );
 
   __PACKAGE__->register_class( Artist => 'DBIC::ShadowTest::Artist' );
   __PACKAGE__->register_class( CD => 'DBIC::ShadowTest::CD' );
@@ -368,7 +376,7 @@ note('delete the other 2 artists');
 $s->resultset('Artist')->search({ name => { '!=', 'very_sneaky' }})->delete_all;
 $s->{_shadow_changeset_timestamp}++;
 
-use Data::Dumper::Concise;
+#use Data::Dumper::Concise;
 #die Dumper
 my $s_state = { map {
   my @cols = $s->source($_)->columns;
@@ -385,6 +393,8 @@ my $s_state = { map {
 # * once a row is deleted, all its existing shadows have their pk-pointing-fks set to NULL
 # * lifecycle is an integer that increments once per INSERT and stays the sime for the
 # lifetime of the shadowed row. This is what we use to build relationships between shadows
+#use Test::Differences;
+#eq_or_diff(
 is_deeply(
   $s_state,
   {
@@ -419,14 +429,16 @@ is_deeply(
       [qw/  3         669               2             3                   3                 unplugged               1                             4                           /],
       [qw/  4         670               2             4                   _UNDEF_           still_a_"rockstar"      2                             _UNDEF_                     /],
       [qw/  5         670               2             5                   5                 barry_o'bama            2                             9                           /],
-      [qw/  6         681               1             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
-      [qw/  7         681               1             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
-      [qw/  8         681               1             3                   3                 unplugged(tm)           1                             4                           /],
-      [qw/  9         681               1             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
-      [qw/  10        681               1             5                   5                 barry_o'bama(tm)        2                             9                           /],
-      [qw/  11        682               0             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
-      [qw/  12        682               0             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
-      [qw/  13        682               0             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
+      [qw/  6         679               1             3                   3                 unplugged               3                             4                           /],
+      [qw/  7         679               1             5                   5                 barry_o'bama            3                             9                           /],
+      [qw/  8         681               1             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
+      [qw/  9         681               1             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
+      [qw/  10        681               1             3                   3                 unplugged(tm)           3                             4                           /],
+      [qw/  11        681               1             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
+      [qw/  12        681               1             5                   5                 barry_o'bama(tm)        3                             9                           /],
+      [qw/  13        682               0             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
+      [qw/  14        682               0             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
+      [qw/  15        682               0             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
     ],
     Track => [
       [qw/  cd_id title             position  /],

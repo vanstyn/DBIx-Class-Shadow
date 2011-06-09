@@ -7,6 +7,7 @@ use base qw/DBIx::Class::Relationship::Cascade::Rekey DBIx::Class::Core/;
 
 use Time::HiRes qw/gettimeofday/;
 use List::Util qw/first/;
+use Test::Deep::NoTest qw/eq_deeply/;
 use namespace::clean;
 
 __PACKAGE__->mk_group_accessors (inherited => qw/shadow_relationships _shadow_columns/);
@@ -26,6 +27,9 @@ sub shadow_columns {
 
 sub _instantiate_shadow_row {
   my ($self, $stage, $lifecycle) = @_;
+
+  $self->throw_exception('Only insertions can happen without a lifecycle value')
+    if (!$lifecycle and $stage != 2);
 
   # we need to set our own lifecycle and also retrieve related lifecycles via
   # the main object relationships
@@ -76,7 +80,7 @@ sub _instantiate_shadow_row {
       $local_col =~ s/^self\.//
         or $self->throw_exception("Unexpected relationship fk name '$local_col'");
 
-      $new_shadow->$local_col($lifecycle
+      $new_shadow->$local_col($stage == 0
         ? $shadow_rsrc
             ->resultset
              ->search({ shadowed_lifecycle => { '=', $lifecycle } }, { rows => 1 })
@@ -127,29 +131,89 @@ sub update {
   my $upd = shift;
   $self->set_inflated_columns($upd) if $upd;
 
-  my $dirtycols = {$self->get_dirty_columns};
+  my $shadowed_cols = { map { $_ => 1 } @{$self->shadow_columns} };
 
-  return $self->next::method(undef, @_)
-    unless first { exists $dirtycols->{$_} } @{$self->shadow_columns};
+  my $changes = {$self->get_dirty_columns};
+  my $has_trackable_changes = defined first
+    { exists $changes->{$_} }
+    keys %$shadowed_cols
+  ;
+
+  my $preupdate_state = { $self->get_columns }
+    unless $has_trackable_changes;
 
   my $rsrc = $self->result_source;
   my $schema = $rsrc->schema;
 
-  my $guard = $schema->txn_scope_guard;
+  my $guard = $schema->txn_scope_guard
+    unless $schema->{_shadow_changeset_rows};
 
-  # do the actual update
-  $self->next::method(@_);
+  local $schema->{_shadow_changeset_rows} = []
+    if $guard;
 
-  $self->_instantiate_shadow_row(
-    1,
-    $rsrc->resultset
-          ->search($self->ident_condition)
-           ->search_related($shadows_rel, {}, { rows => 1 })
-            ->get_column('shadowed_lifecycle')
-             ->as_query
-  )->insert;
+  # do the actual update (even if apparent noop)
+  $self->next::method(undef, @_);
 
-  $guard->commit;
+  # something could have changed during the update cascades
+  if ($preupdate_state) {
+    my $updated_state = {$self->get_columns};
+    for my $col (keys %$updated_state) {
+      if (! eq_deeply ($preupdate_state->{$col}, $updated_state->{$col}) ) {
+        if ($shadowed_cols->{$col}) {
+          $has_trackable_changes = 1;
+          last;
+        }
+        else {
+          $changes->{$col} = $updated_state->{$col};
+        }
+      }
+    }
+  }
+
+  my $possible_duplicate;
+  unless ($has_trackable_changes) {
+    REL:
+    for my $rel ($rsrc->relationships) {
+      my $relinfo = $rsrc->relationship_info($rel);
+      if (
+        $relinfo->{attrs}{is_foreign}
+          and
+        $relinfo->{attrs}{shadowed_by_relname}
+      ) {
+        my @self_cols = values %{$relinfo->{cond}};
+        for (@self_cols) {
+          $_ =~ s/^self\.// or $self->throw_exception(
+            "Unexpected relationship fk name '$_'"
+          );
+          if ($changes->{$_}) {
+            $has_trackable_changes = 1;
+            $possible_duplicate = 1;
+            last REL;
+          }
+        }
+      }
+    }
+  };
+
+  if ($has_trackable_changes) {
+    my $sh = $self->_instantiate_shadow_row(
+      1,
+      $rsrc->resultset
+            ->search($self->ident_condition)
+             ->search_related($shadows_rel, {}, { rows => 1 })
+              ->get_column('shadowed_lifecycle')
+               ->as_query
+    );
+    $sh->{_possibly_duplicate_shadow} = 1
+      if $possible_duplicate;
+
+    push @{$schema->{_shadow_changeset_rows}}, $sh;
+  }
+
+  if ($guard) {
+    $_->insert for reverse @{$schema->{_shadow_changeset_rows}};
+    $guard->commit;
+  }
 
   $self;
 }

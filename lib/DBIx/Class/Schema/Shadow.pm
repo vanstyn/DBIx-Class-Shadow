@@ -203,7 +203,11 @@ sub _gen_shadow_relationship {
 
     unless ($our_shadow->has_column ($foreign_id_col)) {
       $our_shadow->add_column(
-        $foreign_id_col => { data_type => 'BIGINT', is_nullable => $optional_belongs_to ? 1 : 0 }
+        $foreign_id_col => {
+          data_type => 'BIGINT',
+          retrieve_on_insert => 1,
+          is_nullable => $optional_belongs_to ? 1 : 0
+        },
       );
       $self->_reapply_source_prototype($our_shadow->result_source_instance);
     }
@@ -215,7 +219,6 @@ sub _gen_shadow_relationship {
       for (values %$stripped_cond) {
         $rsrc->add_columns( ('+' . $_) => { retrieve_on_insert => 1 } );
       }
-      $self->_reapply_source_prototype($rsrc);
     }
   }
   else {
@@ -230,7 +233,7 @@ sub _gen_shadow_relationship {
 
     unless ($foreign_shadow->has_column ($our_id_fk_col)) {
       $foreign_shadow->add_column(
-        $our_id_fk_col => { data_type => 'BIGINT' }
+        $our_id_fk_col => { data_type => 'BIGINT', retrieve_on_insert => 1 }
       );
       $self->_reapply_source_prototype($foreign_shadow->result_source_instance);
     }
@@ -239,11 +242,21 @@ sub _gen_shadow_relationship {
   }
 
   # do not deploy any FK constraints
-  $our_shadow->has_many("${rel}_shadows" => $foreign_shadow, $shadow_rel_cond, {
-    is_foreign_key_constraint => 0,
-    is_foreign => $relinfo->{attrs}{is_foreign},  # inherit this so we have a sense of direction
+  my $sh_relname = "${rel}_shadows";
+  $our_shadow->has_many($sh_relname => $foreign_shadow, $shadow_rel_cond, {
     shadows_original_relname => $rel,
+    cascade_rekey => 1,
+
+    # inherit this so we have a sense of direction
+    is_foreign => $relinfo->{attrs}{is_foreign},
+
+    # FIXME - perhaps need to inherit this too, not sure if will result in
+    # deployable stuff however (it's a has_many <-> has_many)
+    is_foreign_key_constraint => 0,
   });
+
+  $relinfo->{attrs}{shadowed_by_relname} = $sh_relname;
+  $self->_reapply_source_prototype($rsrc);
 }
 
 # when some changes are made to a source we want to find its

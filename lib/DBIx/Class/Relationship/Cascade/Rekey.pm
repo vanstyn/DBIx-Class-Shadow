@@ -9,6 +9,8 @@ package # hide from PAUSE
 use strict;
 use warnings;
 use DBIx::Class::Carp;
+use Test::Deep::NoTest 'eq_deeply';
+use namespace::clean;
 
 sub _track_storage_value {
   my ($self, $col) = @_;
@@ -101,9 +103,7 @@ sub update {
 
       my $rel_src = $rsrc->related_source($rel);
       my $rel_result = $rel_src->result_class;
-      my $rel_rs = $rel_src->resultset->search($old_cond, { columns => [
-        grep { $rel_result->_track_storage_value($_) } $rel_src->columns
-      ]});
+      my $rel_rs = $rel_src->resultset->search($old_cond);
 
       if ($update_actions->{$rel} eq 'restrict') {
         $self->throw_exception(sprintf
@@ -136,7 +136,8 @@ sub update {
           }
         }
 
-        $rel_rs->update_all($new_cond);
+        $rel_rs->update_all($new_cond)
+          unless eq_deeply($old_cond, $new_cond);
       }
     }
 
@@ -233,9 +234,7 @@ sub delete {
 
       my $rel_src = $rsrc->related_source($rel);
       my $rel_result = $rel_src->result_class;
-      my $rel_rs = $rel_src->resultset->search($old_cond, { columns => [
-        grep { $rel_result->_track_storage_value($_) } $rel_src->columns
-      ]});
+      my $rel_rs = $rel_src->resultset->search($old_cond);
 
       if ($delete_actions->{$rel} eq 'restrict') {
         $self->throw_exception(sprintf
