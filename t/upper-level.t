@@ -2,13 +2,13 @@
   package DBIC::ShadowTest::Result;
   use base qw/DBIx::Class::Core/;
 
-  __PACKAGE__->load_components(qw(Shadow::Rels Shadow::Delta));
+  #__PACKAGE__->load_components(qw(Shadow::Rels Shadow::Delta));
 
   # method as_delta { $self->delta_class->new($self->previous->get_inflated_columns, $self->get_inflated_columns) }
 
-  # add's a belongs_tos (or has_ones?) called 'next' and 'previous' pointing to the other versions for this result
-  __PACKAGE__->define_next_rel;
-  __PACKAGE__->define_previous_rel;
+  ## add's a belongs_tos (or has_ones?) called 'next' and 'previous' pointing to the other versions for this result
+  #__PACKAGE__->define_next_rel;
+  #__PACKAGE__->define_previous_rel;
   # we need some attr to unambiguously identify the direction of a relation
   # is_foreign_key_constraint is already taken to mean "create/do not create a
   # real constraint on deploy()" so instead I am making up a new one. We need
@@ -71,14 +71,16 @@
   use strict;
 
   use base qw/DBIC::ShadowTest::Result/;
-  __PACKAGE__->load_components(qw/Shadow Shadow::Rels/);
+  __PACKAGE__->load_components(qw/Shadow
+  /);
+  #Shadow::Rels
 
   # add's a has_many called 'versions' pointing to the other versions for this result
   # optional args:
   # {
   #    name => 'versions',
   # }
-  __PACKAGE__->define_versions_rel;
+  #__PACKAGE__->define_versions_rel;
 
   __PACKAGE__->shadow_columns([qw/id key value/]);
 
@@ -109,7 +111,8 @@
   use warnings;
   use strict;
 
-  use base qw/DBIx::Class::Shadow::DefaultChangeset/; # this adds an id and a datestamp I guess?
+  #use base qw/DBIx::Class::Shadow::DefaultChangeset/; # this adds an id and a datestamp I guess?
+  use base qw/DBIx::Class::Core/; # this adds an id and a datestamp I guess?
   sub new {
      my ($class, $args, @rest) = @_;
 
@@ -137,9 +140,9 @@
   __PACKAGE__->load_components(qw/Schema::Shadow/);
 
   __PACKAGE__->shadow_result_base_class( 'DBIC::ShadowTest::Result' );
-  __PACKAGE__->shadow_changeset_result( 'DBIC::ShadowTest::Result::Changeset' );
+  #__PACKAGE__->shadow_changeset_result( 'DBIC::ShadowTest::Result::Changeset' );
 
-  __PACKAGE__->register_class( Changeset => 'DBIC::ShadowTest::Changeset' );
+  #__PACKAGE__->register_class( Changeset => 'DBIC::ShadowTest::Changeset' );
   __PACKAGE__->register_class( Config => 'DBIC::ShadowTest::Config' );
 }
 
@@ -147,6 +150,7 @@ use warnings;
 use strict;
 
 use Test::More;
+use Test::Deep;
 
 my $s = DBIC::ShadowTest->connect('dbi:SQLite::memory:');
 
@@ -162,9 +166,142 @@ $s->resultset('Config')->create($_) for ({
 
 my $level = $s->resultset('Config')->single({ key => 'log_level' });
 
-$s->changeset_do({ user => 1, session => 4, caller => 'this_would_be_dumb' }, sub {
-   $level->update({ value => 'DEBUG' });
-});
+$level->update({ value => 'DEBUG' });
+$level->update({ value => 'INFO' });
+$level->update({ value => 'WARN' });
+$level->update({ value => 'ERROR' });
+$level->update({ value => 'FATAL' });
+use Devel::Dwarn;
+
+my $trace = {
+  shadow_id => 2,
+  shadow_stage => 2,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "TRACE",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+my $debug = {
+  shadow_id => 4,
+  shadow_stage => 1,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "DEBUG",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+my $info = {
+  shadow_id => 5,
+  shadow_stage => 1,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "INFO",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+my $warn = {
+  shadow_id => 6,
+  shadow_stage => 1,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "WARN",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+my $error = {
+  shadow_id => 7,
+  shadow_stage => 1,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "ERROR",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+my $fatal = {
+  shadow_id => 8,
+  shadow_stage => 1,
+  shadow_timestamp => -1,
+  shadow_val_id => 2,
+  shadow_val_key => "log_level",
+  shadow_val_value => "FATAL",
+  shadowed_curpk_id => 2,
+  shadowed_lifecycle => 2
+};
+
+# all level versions
+is_deeply(
+   [
+      $s->resultset('Config::Shadow')->search({
+         shadow_val_id => $level->id
+      }, {
+         result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+      })->all
+   ],
+   [ $trace, $debug, $info, $warn, $error, $fatal ],
+   'got expected versions'
+);
+
+
+# version X
+my $version_X_rs = sub {
+   $level->shadows->search(undef, {
+      order_by     => 'shadow_id',
+      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+   })->slice($_[0] - 1)
+};
+
+is_deeply([$version_X_rs->(1)->all], [$trace], 'version(1) works');
+is_deeply([$version_X_rs->(2)->all], [$debug], 'version(2) works');
+is_deeply([$version_X_rs->(3)->all], [$info], 'version(3) works');
+is_deeply([$version_X_rs->(4)->all], [$warn], 'version(4) works');
+is_deeply([$version_X_rs->(5)->all], [$error], 'version(5) works');
+is_deeply([$version_X_rs->(6)->all], [$fatal], 'version(6) works');
+
+# after X
+my $after_X_rs = sub {
+   $level->shadows->search(undef, {
+      order_by     => 'shadow_id',
+      offset       => $_[0],
+      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+   })
+};
+is_deeply([$after_X_rs->(1)->all], [$debug, $info, $warn, $error, $fatal], 'after(1) works');
+is_deeply([$after_X_rs->(2)->all], [$info, $warn, $error, $fatal], 'after(2) works');
+is_deeply([$after_X_rs->(3)->all], [$warn, $error, $fatal], 'after(3) works');
+is_deeply([$after_X_rs->(4)->all], [$error, $fatal], 'after(4) works');
+is_deeply([$after_X_rs->(5)->all], [$fatal], 'after(5) works');
+is_deeply([$after_X_rs->(6)->all], [], 'after(6) works');
+
+# before X
+my $before_X_rs = sub {
+   $level->shadows->search({
+      shadow_id     =>
+        { '<' => $version_X_rs->($_[0])->get_column('shadow_id')->as_query },
+   }, {
+      order_by     => { -desc => 'shadow_id' },
+      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+   })
+};
+is_deeply([$before_X_rs->(1)->all], [], 'before(1) works');
+is_deeply([$before_X_rs->(2)->all], [$trace], 'before(2) works');
+is_deeply([$before_X_rs->(3)->all], [$debug, $trace], 'before(3) works');
+is_deeply([$before_X_rs->(4)->all], [$info, $debug, $trace], 'before(4) works');
+is_deeply([$before_X_rs->(5)->all], [$warn, $info, $debug, $trace], 'before(5) works');
+is_deeply([$before_X_rs->(6)->all], [$error, $warn, $info, $debug, $trace], 'before(6) works');
+
+#$s->changeset_do({ user => 1, session => 4, caller => 'this_would_be_dumb' }, sub {
+#});
 
 # shadow resultset methods:
 #   before
