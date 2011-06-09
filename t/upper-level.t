@@ -165,6 +165,8 @@ $s->resultset('Config')->create($_) for ({
 });
 
 my $level = $s->resultset('Config')->single({ key => 'log_level' });
+my $dir = $s->resultset('Config')->single({ key => 'log_directory' });
+my $code = $s->resultset('Config')->single({ key => 'account_code' });
 
 $level->update({ value => 'DEBUG' });
 $level->update({ value => 'INFO' });
@@ -300,20 +302,56 @@ is_deeply([$before_X_rs->(4)->all], [$info, $debug, $trace], 'before(4) works');
 is_deeply([$before_X_rs->(5)->all], [$warn, $info, $debug, $trace], 'before(5) works');
 is_deeply([$before_X_rs->(6)->all], [$error, $warn, $info, $debug, $trace], 'before(6) works');
 
-#$s->changeset_do({ user => 1, session => 4, caller => 'this_would_be_dumb' }, sub {
-#});
+SKIP: {
+skip 'changesets not implemented at all yet', 2;
 
-# shadow resultset methods:
-#   before
-#     Takes datetime object or a string
-#     reverse sort
-#   after
-#     Takes datetime object or a string
+# note that the initial hashref is not required, it's just if you want to pass extra stuff
+$s->changeset_do({ user => 1, session => 4 }, sub {
+   # maybe the sub should get the $changeset obj passed to it?
+   $level->update({ value => 'TRACE' });
+   $dir->update({ value => '/home/frew/var/log' });
+   $code->update({ value => '1234567890' });
+});
+
+# do changesets get generated for stuff that's not explicitly in a changeset?  I think they should, optionally at least...?
+
+$s->changeset_do({ user => 2, session => 5 }, sub {
+   $level->update({ value => 'FATAL' });
+});
+
+is_deeply([$s->resultset('Config')
+   ->related_resultset('shadow')
+   ->search({
+      changeset_id => { '<=' => 1 },
+   }, {
+      # I think there needs to be some group by and having stuff to only get the newest
+      # of each shadow
+      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+   })], [{ log_level => 'TRACE' }, { log_directory => '/home/frew/var/log' }, { account_code => '123456789'}],
+   'changeset state (1) works');
+
+is_deeply([$s->resultset('Config')
+   ->related_resultset('shadow')
+   ->search({
+      changeset_id => { '<=' => 1 },
+   }, {
+      # I think there needs to be some group by and having stuff to only get the newest
+      # of each shadow
+      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+   })], [{ log_level => 'FATAL' }, { log_directory => '/home/frew/var/log' }, { account_code => '123456789'}],
+   'changeset state (2) works');
+}
+
+# other thoughts:
+#   currently the shadows are quite different from their actual counterparts, we should offer a simple way
+#     to rebless them into their original row or *something*
 #
-#   next
-#     Takes an int and defaults to 1
-#   previous
-#     Takes an int and defaults to 1
-#     reverses sort
+#   similarly, because all of their column names are different, searching with mutated names is awkward and
+#     should have a nice way to do it
+#
+# things I need to do:
+#   work on some of the shadow components:
+#    * the one that defines the next and previous *relationships*
+#    * as_delta
 
 done_testing;
