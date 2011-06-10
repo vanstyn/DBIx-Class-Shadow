@@ -170,6 +170,9 @@ sub update {
     }
   }
 
+  # we need to walk the relationships and see if there is a
+  # change on an *unshadowed* FK (it will not change our shadow
+  # stored values, but *will* change the shadow linkage)
   my $possible_duplicate;
   unless ($has_trackable_changes) {
     REL:
@@ -186,6 +189,9 @@ sub update {
             "Unexpected relationship fk name '$_'"
           );
           if ($changes->{$_}) {
+            # so a relationship may have changed - still make
+            # a shadow object, but we'll mark it for a check
+            # before insertion
             $has_trackable_changes = 1;
             $possible_duplicate = 1;
             last REL;
@@ -204,6 +210,7 @@ sub update {
               ->get_column('shadowed_lifecycle')
                ->as_query
     );
+
     $sh->{_possibly_duplicate_shadow} = 1
       if $possible_duplicate;
 
@@ -211,7 +218,46 @@ sub update {
   }
 
   if ($guard) {
-    $_->insert for reverse @{$schema->{_shadow_changeset_rows}};
+    for my $sh (reverse @{$schema->{_shadow_changeset_rows}}) {
+
+      if ($sh->{_possibly_duplicate_shadow}) {
+        # before inserting a shadow marked as possible duplicate
+        # check that we don't already have the very same exact
+        # values (except id/timestamp/stage) in the shadow table
+        #
+        # the choice of "check" is a bit odd, but this is because
+        # one can not do WHERE col = (SELECT ...) when both the
+        # col is NULL and the selection returns NULL
+        my $new_shadow_vals = { $sh->get_columns };
+        my $rsrc = $sh->result_source;
+        my @check_cols = grep
+          { $_ !~ /^(?: shadow_id | shadow_timestamp | shadow_stage )$/x }
+          $rsrc->columns
+        ;
+        if (my @literals = grep { ref $new_shadow_vals->{$_} } @check_cols ) {
+
+          my ($lit_vals) = $rsrc->resultset->search({}, {
+            select => [ @{$new_shadow_vals}{@literals} ],
+          })->cursor->all;
+
+          @{$new_shadow_vals}{@literals} = @$lit_vals;
+        }
+
+        # if the last change recorded looks *exactly* like us - skip it
+        next if (
+          $rsrc->resultset->last_shadow_rs->search(
+            { 'me.shadowed_lifecycle' => $new_shadow_vals->{shadowed_lifecycle} },
+          )->as_subselect_rs->search({
+            map {( "me.$_" => $new_shadow_vals->{$_} )} @check_cols
+          })->all
+        );
+
+        # since we already know them - might as well add the values
+        $sh->set_columns($new_shadow_vals);
+      }
+
+      $sh->insert;
+    }
     $guard->commit;
   }
 

@@ -85,7 +85,7 @@
 {
   package DBIC::ShadowTest::ShadowResult;
 
-  use base qw/DBIC::ShadowTest::Result DBIx::Class::Shadow::Row/;
+  use base qw/DBIC::ShadowTest::Result DBIx::Class::Shadow::Result/;
 }
 
 
@@ -228,7 +228,13 @@ is_deeply (
   ({ map
     {
       my $src = $s->source($_);
-      $_ => { map { $_ => $src->relationship_info($_)->{cond} } $src->relationships };
+      $_ => { map
+        { $_ => ref ($src->relationship_info($_)->{cond}) eq 'CODE'
+          ? '_CUSTOM_'
+          : $src->relationship_info($_)->{cond}
+        }
+        $src->relationships
+      };
     } $s->sources
   }),
   {
@@ -239,6 +245,8 @@ is_deeply (
     },
     'Artist::Shadow' => {
       current_version => {qw/foreign.name                         self.shadowed_curpk_name/},
+      older_shadows   => '_CUSTOM_',
+      newer_shadows   => '_CUSTOM_',
       cds_shadows     => {qw/foreign.rel_shadow_artists_lifecycle self.shadowed_lifecycle/},
     },
 
@@ -250,10 +258,12 @@ is_deeply (
       shadows      => {qw/foreign.shadowed_curpk_id self.id/},
     },
     'CD::Shadow' => {
-      current_version      => {qw/foreign.id                        self.shadowed_curpk_id/},
-      artist_shadows       => {qw/foreign.shadowed_lifecycle        self.rel_shadow_artists_lifecycle/},
-      tracks_shadows       => {qw/foreign.rel_shadow_cds_lifecycle  self.shadowed_lifecycle/},
-      single_track_shadows => {qw/foreign.shadowed_lifecycle        self.rel_shadow_tracks_lifecycle/},
+      current_version       => {qw/foreign.id                        self.shadowed_curpk_id/},
+      older_shadows         => '_CUSTOM_',
+      newer_shadows         => '_CUSTOM_',
+      artist_shadows        => {qw/foreign.shadowed_lifecycle        self.rel_shadow_artists_lifecycle/},
+      tracks_shadows        => {qw/foreign.rel_shadow_cds_lifecycle  self.shadowed_lifecycle/},
+      single_track_shadows  => {qw/foreign.shadowed_lifecycle        self.rel_shadow_tracks_lifecycle/},
     },
     Painting => {
       artist => {qw/foreign.name self.artist_name/},
@@ -268,6 +278,8 @@ is_deeply (
     'Track::Shadow' => {
       current_version   => {qw/foreign.cd_id                        self.shadowed_curpk_cd_id
                                foreign.position                     self.shadowed_curpk_position/},
+      older_shadows     => '_CUSTOM_',
+      newer_shadows     => '_CUSTOM_',
       cd_shadows        => {qw/foreign.shadowed_lifecycle           self.rel_shadow_cds_lifecycle/},
       cd_single_shadows => {qw/foreign.rel_shadow_tracks_lifecycle  self.shadowed_lifecycle/},
     },

@@ -12,8 +12,9 @@ use List::UtilsBy qw/sort_by/;
 
 use namespace::clean;
 
-__PACKAGE__->mk_group_accessors (inherited => qw/shadow_result_base_class/);
-__PACKAGE__->shadow_result_base_class('DBIx::Class::Shadow::Row');
+__PACKAGE__->mk_group_accessors (inherited => qw/shadow_result_base_class shadow_resultset_base_class/);
+__PACKAGE__->shadow_result_base_class('DBIx::Class::Shadow::Result');
+__PACKAGE__->shadow_resultset_base_class('DBIx::Class::Shadow::ResultSet');
 
 my $shadow_suffix = '::Shadow';
 my $row_shadows_relname = 'shadows';
@@ -85,6 +86,7 @@ sub _gen_shadow_source {
     $self->ensure_class_loaded($self->shadow_result_base_class);
     $self->inject_base($shadow_class, $self->shadow_result_base_class);
     $shadow_class->table('shadow_' . $res_table);
+    $shadow_class->resultset_class($self->shadow_resultset_base_class);
 
     my $columns_info = $res_class->columns_info;
     for (keys %$columns_info) {
@@ -124,6 +126,30 @@ sub _gen_shadow_source {
       on_delete => 'set null', on_update => 'cascade', join_type => 'left',
     });
 
+    $shadow_class->might_have(older_shadows => $shadow_class, sub {(
+      {
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { -ident => "$_[0]->{self_alias}.shadowed_lifecycle" },
+        "$_[0]->{foreign_alias}.shadow_id" => { '<' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
+      },
+      $_[0]->{self_rowobj} && {
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { $_[0]->{self_rowobj}->shadowed_lifecycle },
+        "$_[0]->{foreign_alias}.shadow_id" => { '<' => { $_[0]->{self_rowobj}->shadow_id } },
+      },
+    )}, { cascade_rekey => 0, cascade_delete => 0 } );
+
+    $shadow_class->might_have(newer_shadows => $shadow_class, sub {(
+      {
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { -ident => "$_[0]->{self_alias}.shadowed_lifecycle" },
+        "$_[0]->{foreign_alias}.shadow_id" => { '>' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
+      },
+      $_[0]->{self_rowobj} && {
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { $_[0]->{self_rowobj}->shadowed_lifecycle },
+        "$_[0]->{foreign_alias}.shadow_id" => { '>' => { $_[0]->{self_rowobj}->shadow_id } },
+      },
+    )}, { cascade_rekey => 0, cascade_delete => 0 } );
+
+    # This is the change on the original $res_class, no reapply needed
+    # as it has not been register_source()d yet
     $res_class->has_many($row_shadows_relname => $shadow_class, $self->_hash_for_rel({ reverse %$current_belongs_to}),
       { cascade_delete => 0 }, # FIXME - need to think what to do about cascade_copy - not clear-cut
     );
