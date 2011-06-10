@@ -247,9 +247,10 @@ sub update {
         next if (
           $rsrc->resultset->last_shadow_rs->search(
             { 'me.shadowed_lifecycle' => $new_shadow_vals->{shadowed_lifecycle} },
+            { columns => \@check_cols },
           )->as_subselect_rs->search({
-            map {( "me.$_" => $new_shadow_vals->{$_} )} @check_cols
-          })->all
+            map {( $_ => $new_shadow_vals->{$_} )} @check_cols
+          }, { columns => $check_cols[0] })->cursor->all
         );
 
         # since we already know them - might as well add the values
