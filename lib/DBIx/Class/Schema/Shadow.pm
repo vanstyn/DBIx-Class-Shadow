@@ -126,7 +126,7 @@ sub _gen_shadow_source {
       on_delete => 'set null', on_update => 'cascade', join_type => 'left',
     });
 
-    $shadow_class->might_have(older_shadows => $shadow_class, sub {(
+    $shadow_class->has_many(older_shadows => $shadow_class, sub {(
       {
         "$_[0]->{foreign_alias}.shadowed_lifecycle" => { -ident => "$_[0]->{self_alias}.shadowed_lifecycle" },
         "$_[0]->{foreign_alias}.shadow_id" => { '<' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
@@ -137,7 +137,7 @@ sub _gen_shadow_source {
       },
     )}, { cascade_rekey => 0, cascade_delete => 0 } );
 
-    $shadow_class->might_have(newer_shadows => $shadow_class, sub {(
+    $shadow_class->has_many(newer_shadows => $shadow_class, sub {(
       {
         "$_[0]->{foreign_alias}.shadowed_lifecycle" => { -ident => "$_[0]->{self_alias}.shadowed_lifecycle" },
         "$_[0]->{foreign_alias}.shadow_id" => { '>' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
