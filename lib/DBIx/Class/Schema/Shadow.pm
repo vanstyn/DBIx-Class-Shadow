@@ -32,7 +32,7 @@ sub register_class {
 
     # in essence skip any relationship we can not yet work with *unless*
     # it was specifically requested
-    for my $rel (@{ $requested_relationships || [ $res_class->relationships ] }) {
+    for my $rel (@{ $requested_relationships || [ sort $res_class->relationships ] }) {
       next if $rel eq $row_shadows_relname;
 
       $self->throw_exception("Relationship clash - 'current_version' is a generated relationship for every shadow")
