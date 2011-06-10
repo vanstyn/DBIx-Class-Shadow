@@ -106,10 +106,12 @@ sub _gen_shadow_source {
     }
 
     $shadow_class->add_columns(
-      shadow_id => { data_type => 'BIGINT', is_auto_increment => 1 },
+      shadow_id => { data_type => 'INT', is_auto_increment => 1 },
       shadow_timestamp => { data_type => 'BIGINT' }, # sprintf "%d%06d", Time::HiRes::gettimeofday()
-      shadow_stage => { data_type => 'TINYINT' }, # 2 - new insert, 1 - update, 0 - deletion
-      shadowed_lifecycle => { data_type => 'BIGINT', retrieve_on_insert => 1 },
+                                                     # as high as 2,147,483,647,999,999 (higher after 2038)
+                                                     # hence bigint
+      shadow_stage => { data_type => 'TINYINT' }, # 2 - insertion, 1 - update, 0 - deletion
+      shadowed_lifecycle => { data_type => 'INT', retrieve_on_insert => 1 },
       (map {( "shadowed_curpk_$_" => { %{$columns_info->{$_}}, is_nullable => 1 } )} @pks),
       $self->_sort_colhash( { map
         {( "shadow_val_$_" => { accessor => $_, %{$shadow_cols->{$_}} } )}
@@ -230,7 +232,7 @@ sub _gen_shadow_relationship {
     unless ($our_shadow->has_column ($foreign_id_col)) {
       $our_shadow->add_column(
         $foreign_id_col => {
-          data_type => 'BIGINT',
+          data_type => 'INT',
           retrieve_on_insert => 1,
           is_nullable => $optional_belongs_to ? 1 : 0
         },
@@ -259,7 +261,7 @@ sub _gen_shadow_relationship {
 
     unless ($foreign_shadow->has_column ($our_id_fk_col)) {
       $foreign_shadow->add_column(
-        $our_id_fk_col => { data_type => 'BIGINT', retrieve_on_insert => 1 }
+        $our_id_fk_col => { data_type => 'INT', retrieve_on_insert => 1 }
       );
       $self->_reapply_source_prototype($foreign_shadow->result_source_instance);
     }
