@@ -2,7 +2,6 @@ use warnings;
 use strict;
 
 use Test::More;
-use Test::Deep;
 
 use lib 't/lib';
 use DBICTest::S;
@@ -28,7 +27,6 @@ $level->update({ value => 'INFO' });
 $level->update({ value => 'WARN' });
 $level->update({ value => 'ERROR' });
 $level->update({ value => 'FATAL' });
-use Devel::Dwarn;
 
 my $trace = {
   shadow_id => 2,
@@ -127,8 +125,16 @@ is_deeply([$version_X_rs->(6)->all], [$fatal], 'version(6) works');
 
 # after X
 my $after_X_rs = sub { $level->shadows->after($_[0])->$hri };
-is_deeply([$after_X_rs->(1)->all], [$debug, $info, $warn, $error, $fatal], 'after(1) works');
-is_deeply([$after_X_rs->(2)->all], [$info, $warn, $error, $fatal], 'after(2) works');
+is_deeply(
+   [$after_X_rs->(1)->all],
+   [$debug, $info, $warn, $error, $fatal],
+   'after(1) works'
+);
+is_deeply(
+   [$after_X_rs->(2)->all],
+   [$info, $warn, $error, $fatal],
+   'after(2) works'
+);
 is_deeply([$after_X_rs->(3)->all], [$warn, $error, $fatal], 'after(3) works');
 is_deeply([$after_X_rs->(4)->all], [$error, $fatal], 'after(4) works');
 is_deeply([$after_X_rs->(5)->all], [$fatal], 'after(5) works');
@@ -140,13 +146,22 @@ is_deeply([$before_X_rs->(1)->all], [], 'before(1) works');
 is_deeply([$before_X_rs->(2)->all], [$trace], 'before(2) works');
 is_deeply([$before_X_rs->(3)->all], [$debug, $trace], 'before(3) works');
 is_deeply([$before_X_rs->(4)->all], [$info, $debug, $trace], 'before(4) works');
-is_deeply([$before_X_rs->(5)->all], [$warn, $info, $debug, $trace], 'before(5) works');
-is_deeply([$before_X_rs->(6)->all], [$error, $warn, $info, $debug, $trace], 'before(6) works');
+is_deeply(
+   [$before_X_rs->(5)->all],
+   [$warn, $info, $debug, $trace],
+   'before(5) works'
+);
+is_deeply(
+   [$before_X_rs->(6)->all],
+   [$error, $warn, $info, $debug, $trace],
+   'before(6) works'
+);
 
 SKIP: {
 skip 'changesets not implemented at all yet', 2;
 
-# note that the initial hashref is not required, it's just if you want to pass extra stuff
+# note that the initial hashref is not required, it's just if you want to pass
+# extra stuff
 $s->changeset_do({ user => 1, session => 4 }, sub {
    # maybe the sub should get the $changeset obj passed to it?
    $level->update({ value => 'TRACE' });
@@ -154,41 +169,37 @@ $s->changeset_do({ user => 1, session => 4 }, sub {
    $code->update({ value => '1234567890' });
 });
 
-# do changesets get generated for stuff that's not explicitly in a changeset?  I think they should, optionally at least...?
+# do changesets get generated for stuff that's not explicitly in a changeset?
+# I think they should, optionally at least...?
 
 $s->changeset_do({ user => 2, session => 5 }, sub {
    $level->update({ value => 'FATAL' });
 });
 
-is_deeply([$s->resultset('Config')
-   ->related_resultset('shadow')
-   ->search({
-      changeset_id => { '<=' => 1 },
-   }, {
-      # I think there needs to be some group by and having stuff to only get the newest
-      # of each shadow
-      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
-   })], [{ log_level => 'TRACE' }, { log_directory => '/home/frew/var/log' }, { account_code => '123456789'}],
-   'changeset state (1) works');
+my $changeset_X_rs = sub {
+   $s->resultset('Config')->related_resultset('shadows')->changeset($_[0])->$hri
+};
+is_deeply(
+   [$changeset_X_rs->(1)->all],
+   [{ log_level => 'TRACE' }, { log_directory => '/home/frew/var/log' },
+      { account_code => '123456789'}],
+   'changeset state (1) works'
+);
 
-is_deeply([$s->resultset('Config')
-   ->related_resultset('shadow')
-   ->search({
-      changeset_id => { '<=' => 1 },
-   }, {
-      # I think there needs to be some group by and having stuff to only get the newest
-      # of each shadow
-      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
-   })], [{ log_level => 'FATAL' }, { log_directory => '/home/frew/var/log' }, { account_code => '123456789'}],
-   'changeset state (2) works');
+is_deeply(
+   [$changeset_X_rs->(2)->all],
+   [{ log_level => 'FATAL' }, { log_directory => '/home/frew/var/log' },
+      { account_code => '123456789'}],
+   'changeset state (2) works'
+);
 }
 
 # other thoughts:
-#   currently the shadows are quite different from their actual counterparts, we should offer a simple way
-#     to rebless them into their original row or *something*
+#   currently the shadows are quite different from their actual counterparts,
+#     we should offer a simple way to rebless them into their original row
 #
-#   similarly, because all of their column names are different, searching with mutated names is awkward and
-#     should have a nice way to do it
+#   similarly, because all of their column names are different, searching with
+#     mutated names is awkward and should have a nice way to do it
 #
 # things I need to do:
 #   work on some of the shadow components:
