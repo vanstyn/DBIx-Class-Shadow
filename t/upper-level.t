@@ -156,6 +156,11 @@ is_deeply(
    [$error, $warn, $info, $debug, $trace],
    'before(6) works'
 );
+# pretty sure this has to use correlated subqueries
+my $shadows = $level->shadows;
+
+is($shadows->groknik('value', 'TRACE', 'DEBUG')->count, 1);
+is($shadows->groknik('value', 'DEBUG', 'TRACE')->count, 0);
 
 SKIP: {
 skip 'changesets not implemented at all yet', 2;
@@ -201,9 +206,5 @@ is_deeply(
 #   similarly, because all of their column names are different, searching with
 #     mutated names is awkward and should have a nice way to do it
 #
-# things I need to do:
-#   work on some of the shadow components:
-#    * the one that defines the next and previous *relationships*
-#    * as_delta
 
 done_testing;

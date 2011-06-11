@@ -43,4 +43,33 @@ sub changeset {
        ->search_related(next_shadows => { 'next_shadows.id' => undef })
 }
 
+my $as = sub {
+   my ($aq, $as) = @_;
+
+   my ($sql, @bind) = @{$$aq};
+   return \["$sql $as", @bind ];
+};
+
+# FIXME: wtf frew.
+sub groknik {
+  my ($self, $col, $from, $to) = @_;
+
+  my $subq = $self->related_resultset('older_shadows')->search({
+    'older_shadows.shadow_id' => { -ident => 'me.shadow_id' },
+  }, {
+    order_by => { -desc => 'older_shadows.shadow_id' },
+    rows => 1,
+  })->get_column("shadow_val_$col")->as_query;
+
+  $self->search(undef, {
+    '+columns' => {
+      before => $as->($subq,'before'),
+      current => $as->($self->get_column("shadow_val_$col")->as_query,'current' ),
+    },
+  })->search({
+    before => $from,
+    current => $to,
+  })->as_subselect_rs
+}
+
 1;
