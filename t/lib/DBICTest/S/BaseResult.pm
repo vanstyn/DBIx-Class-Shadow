@@ -64,4 +64,27 @@ sub has_one {
   $self->next::method(@args);
 }
 
+use Data::Dumper::Concise;
+
+sub render_delta {
+   my ($self, $delta) = @_;
+
+   "{\n" .  join("\n",
+      map {
+         my $k = $_;
+         chomp(my $l = Dumper($delta->{$_}[0]));
+         chomp(my $r = Dumper($delta->{$_}[1]));
+         "     $k => [ $l, $r ]"
+      } keys %$delta
+   ) . "\n   }"
+
+}
+
+sub render {
+  my $self = shift;
+  chomp(my $ret = Dumper({$self->get_columns}));
+  my ($first, @rest) = split /\n/, $ret;
+  "$first\n" . join "\n", map "   $_", @rest;
+}
+
 1;

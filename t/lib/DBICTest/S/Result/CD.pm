@@ -30,5 +30,7 @@ __PACKAGE__->belongs_to(single_track => 'DBICTest::S::Result::Track', {qw/
   foreign.position self.single_track_pos
 /}, { join_type => 'left', on_delete => 'set null' } );
 
+sub render { $_[0]->title }
+
 1;
 
