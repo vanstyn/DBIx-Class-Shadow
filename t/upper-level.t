@@ -200,9 +200,6 @@ is_deeply(
 }
 
 # other thoughts:
-#   currently the shadows are quite different from their actual counterparts,
-#     we should offer a simple way to rebless them into their original row
-#
 #   similarly, because all of their column names are different, searching with
 #     mutated names is awkward and should have a nice way to do it
 #
