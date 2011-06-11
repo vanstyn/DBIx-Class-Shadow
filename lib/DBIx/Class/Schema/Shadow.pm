@@ -134,8 +134,8 @@ sub _gen_shadow_source {
         "$_[0]->{foreign_alias}.shadow_id" => { '<' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
       },
       $_[0]->{self_rowobj} && {
-        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { $_[0]->{self_rowobj}->shadowed_lifecycle },
-        "$_[0]->{foreign_alias}.shadow_id" => { '<' => { $_[0]->{self_rowobj}->shadow_id } },
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => $_[0]->{self_rowobj}->shadowed_lifecycle,
+        "$_[0]->{foreign_alias}.shadow_id" => { '<' => $_[0]->{self_rowobj}->shadow_id },
       },
     )}, { cascade_rekey => 0, cascade_delete => 0 } );
 
@@ -145,8 +145,8 @@ sub _gen_shadow_source {
         "$_[0]->{foreign_alias}.shadow_id" => { '>' => { -ident => "$_[0]->{self_alias}.shadow_id" } },
       },
       $_[0]->{self_rowobj} && {
-        "$_[0]->{foreign_alias}.shadowed_lifecycle" => { $_[0]->{self_rowobj}->shadowed_lifecycle },
-        "$_[0]->{foreign_alias}.shadow_id" => { '>' => { $_[0]->{self_rowobj}->shadow_id } },
+        "$_[0]->{foreign_alias}.shadowed_lifecycle" => $_[0]->{self_rowobj}->shadowed_lifecycle,
+        "$_[0]->{foreign_alias}.shadow_id" => { '>' => $_[0]->{self_rowobj}->shadow_id },
       },
     )}, { cascade_rekey => 0, cascade_delete => 0 } );
 
