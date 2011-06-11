@@ -35,4 +35,12 @@ sub before {
    })
 }
 
+sub changeset {
+  my ($self, $changeset_id) = @_;
+
+  $self->search({ changeset_id => { '<=' => $changeset_id }})
+       ->as_subselect_rs
+       ->search_related(next_shadows => { 'next_shadows.id' => undef })
+}
+
 1;

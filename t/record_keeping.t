@@ -21,6 +21,15 @@ is_deeply (
     } $s->sources
   }),
   {
+    'Config' => {
+      shadows   => {qw/foreign.shadowed_curpk_id  self.id/},
+    },
+    'Config::Shadow' => {
+      current_version => {qw/foreign.id                         self.shadowed_curpk_id/},
+      older_shadows   => '_CUSTOM_',
+      newer_shadows   => '_CUSTOM_',
+    },
+    'Changeset' => {},
     'Artist' => {
       cds       => {qw/foreign.artist_name          self.name/},
       paintings => {qw/foreign.artist_name          self.name/},
@@ -193,6 +202,15 @@ my $s_state = { map {
 is_deeply(
   $s_state,
   {
+    Changeset => [
+      [qw/  id    timestamp     user_id session_id caller /],
+    ],
+    Config => [
+      [qw/  id    key           value /],
+    ],
+    'Config::Shadow' => [
+      [qw/  shadow_id shadow_timestamp  shadow_stage  shadowed_lifecycle  shadowed_curpk_id shadow_val_id shadow_val_key shadow_val_value  /],
+    ],
     Painting => [ # never tracked - nothing left
       [qw/  id    artist_name   title /],
     ],
