@@ -254,14 +254,14 @@ is_deeply(
    'got expected versions'
 );
 
+my $hri = sub {
+  $_[0]->search(undef, {
+    result_class => 'DBIx::Class::ResultClass::HashRefInflator'
+  })
+};
 
 # version X
-my $version_X_rs = sub {
-   $level->shadows->search(undef, {
-      order_by     => 'shadow_id',
-      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
-   })->slice($_[0] - 1)
-};
+my $version_X_rs = sub { $level->shadows->$hri->version($_[0]) };
 
 is_deeply([$version_X_rs->(1)->all], [$trace], 'version(1) works');
 is_deeply([$version_X_rs->(2)->all], [$debug], 'version(2) works');
@@ -271,13 +271,7 @@ is_deeply([$version_X_rs->(5)->all], [$error], 'version(5) works');
 is_deeply([$version_X_rs->(6)->all], [$fatal], 'version(6) works');
 
 # after X
-my $after_X_rs = sub {
-   $level->shadows->search(undef, {
-      order_by     => 'shadow_id',
-      offset       => $_[0],
-      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
-   })
-};
+my $after_X_rs = sub { $level->shadows->after($_[0])->$hri };
 is_deeply([$after_X_rs->(1)->all], [$debug, $info, $warn, $error, $fatal], 'after(1) works');
 is_deeply([$after_X_rs->(2)->all], [$info, $warn, $error, $fatal], 'after(2) works');
 is_deeply([$after_X_rs->(3)->all], [$warn, $error, $fatal], 'after(3) works');
@@ -286,15 +280,7 @@ is_deeply([$after_X_rs->(5)->all], [$fatal], 'after(5) works');
 is_deeply([$after_X_rs->(6)->all], [], 'after(6) works');
 
 # before X
-my $before_X_rs = sub {
-   $level->shadows->search({
-      shadow_id     =>
-        { '<' => $version_X_rs->($_[0])->get_column('shadow_id')->as_query },
-   }, {
-      order_by     => { -desc => 'shadow_id' },
-      result_class => 'DBIx::Class::ResultClass::HashRefInflator'
-   })
-};
+my $before_X_rs = sub { $level->shadows->before($_[0])->$hri };
 is_deeply([$before_X_rs->(1)->all], [], 'before(1) works');
 is_deeply([$before_X_rs->(2)->all], [$trace], 'before(2) works');
 is_deeply([$before_X_rs->(3)->all], [$debug, $trace], 'before(3) works');
