@@ -72,4 +72,17 @@ sub groknik {
   })->as_subselect_rs
 }
 
+my $stage = sub {
+   my $self  = shift;
+   my $stage = shift;
+
+   my $me   = $self->current_source_alias;
+
+   $self->search({ "$me.shadow_stage" => $stage });
+}
+
+sub inserts { shift->$stage(2) }
+sub updates { shift->$stage(1) }
+sub deletes { shift->$stage(0) }
+
 1;
