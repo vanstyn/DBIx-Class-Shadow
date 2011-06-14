@@ -132,4 +132,4 @@ $logtool->($artists, 'artist');
 $logtool->($cds, 'CD');
 $logtool->($s->resultset('Track::Shadow'), 'track');
 
-print join "\n", map "$_[0]\n$_->[1]", sort { $a->[0] <=> $b->[0] } @data;
+print join "\n", map "$_->[0]\n$_->[1]", sort { $a->[0] <=> $b->[0] } @data;
