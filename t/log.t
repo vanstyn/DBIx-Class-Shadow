@@ -1,9 +1,6 @@
 use warnings;
 use strict;
 
-use Test::More;
-use Time::HiRes;
-
 use lib 't/lib';
 use DBICTest::S;
 
@@ -106,24 +103,28 @@ my $collapse = sub {
 };
 
 use Term::ANSIColor;
+use DateTime;
 
+my @data;
 my $logtool = sub {
    my ($rs, $item) = @_;
 
    while (my $d = $rs->next) {
+      my $out = '';
       my ($action, $l, $r) = $d->as_diff;
       if ($action eq 'insert') {
-         print color 'green';
-         print " + Created $item: " . $d->as_result->render . "\n";
+         $out .= color 'green';
+         $out .= " + Created $item: " . $d->as_result->render . "\n";
       } elsif ($action eq 'delete') {
-         print color 'red';
-         print " - Deleted $item: " . $d->as_result->render . "\n";
+         $out .= color 'red';
+         $out .= " - Deleted $item: " . $d->as_result->render . "\n";
       } else {
          my $t = $collapse->($l, $r);
-         print color 'yellow';
-         print "   Updated $item: " . $d->as_result->render_delta($t) . "\n";
+         $out .= color 'yellow';
+         $out .= "   Updated $item: " . $d->as_result->render_delta($t) . "\n";
       }
-      print color 'reset';
+      $out .= color 'reset';
+      push @data, [ $d->shadow_timestamp, $out ];
    }
 };
 
@@ -131,4 +132,4 @@ $logtool->($artists, 'artist');
 $logtool->($cds, 'CD');
 $logtool->($s->resultset('Track::Shadow'), 'track');
 
-done_testing;
+print join "\n", map $_->[1], sort { $a->[0] <=> $b->[0] } @data;

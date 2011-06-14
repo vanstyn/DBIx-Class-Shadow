@@ -74,7 +74,7 @@ sub render_delta {
          my $k = $_;
          chomp(my $l = Dumper($delta->{$_}[0]));
          chomp(my $r = Dumper($delta->{$_}[1]));
-         "     $k => [ $l, $r ]"
+         "     $k => [ $l, $r ],"
       } keys %$delta
    ) . "\n   }"
 
