@@ -10,25 +10,54 @@ use strict;
 use warnings;
 use DBIx::Class::Carp;
 use Test::Deep::NoTest 'eq_deeply';
+use List::Util 'first';
 use namespace::clean;
 
 sub _track_storage_value {
   my ($self, $col) = @_;
   return $self->next::method($col) || do {
-    my $track = 0;
+    my $rsrc = $self->result_source;
 
-    my $rsrc = $self->result_source_instance;
-    for my $rel ( $rsrc->relationships ) {
-      my $relinfo = $rsrc->relationship_info($rel);
-      next unless $relinfo->{attrs}{cascade_rekey};
-      my ($cond) = $rsrc->_resolve_condition($relinfo->{cond}, $rel, $self, $rel);
-      if ($cond->{$col}) {
-        $track = 1;
-        last;
+    my $colinfo = $rsrc->column_info($col);
+
+    # cache as the operation is expensive as hell
+    $colinfo->{_track_storage_value} = do {
+      my $track = 0;
+
+      for my $rel ( $rsrc->relationships ) {
+        my $relinfo = $rsrc->relationship_info($rel);
+        next unless $relinfo->{attrs}{cascade_rekey};
+
+        my ($cond, $is_crosstable) = $rsrc->_resolve_condition($relinfo->{cond}, $rel, $self, $rel);
+
+        $self->throw_exception(sprintf
+          "Relationship '%s' is not re-keyable - only join-free condition relationships are supported",
+          $rsrc->source_name . '/' . $rel,
+        ) if $is_crosstable;
+
+        # simple non-nested condition
+        if (ref $cond eq 'HASH' and ! first { ref $_ } values %$cond) {
+          if ($cond->{$col}) {
+            $track = 1;
+            last;
+          }
+        }
+        # bring out the big gun - extremely ugly, but marginally effective
+        else {
+          if (first { $_ eq $col } (
+            @{$rsrc->schema->storage->_extract_condition_columns($cond)}
+          ) ) {
+            $track = 1;
+            last;
+          }
+        }
       }
-    }
 
-    $track;
+      $track;
+    } unless exists $colinfo->{_track_storage_value};
+
+    $colinfo->{_track_storage_value};
+
   };
 }
 
@@ -89,9 +118,9 @@ sub update {
 
     for my $rel (keys %$update_actions) {
       my ($old_cond, $old_is_crosstable, $new_cond, $new_is_crosstable) = map {
-        $rsrc->_resolve_condition(
+        ($rsrc->_resolve_condition(
           $rels->{$rel}{cond}, $rel, $_, $rel
-        );
+        ))[0,1];
       } ($old_self, $self);
 
       # if a join is necessary it will not work - the original row is no longer there
