@@ -79,7 +79,7 @@ my $stage = sub {
    my $me   = $self->current_source_alias;
 
    $self->search({ "$me.shadow_stage" => $stage });
-}
+};
 
 sub inserts { shift->$stage(2) }
 sub updates { shift->$stage(1) }
