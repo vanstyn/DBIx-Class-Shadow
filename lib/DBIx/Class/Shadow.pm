@@ -5,7 +5,6 @@ use strict;
 
 use base qw/DBIx::Class::Relationship::Cascade::Rekey DBIx::Class::Core/;
 
-use Time::HiRes qw/gettimeofday/;
 use List::Util qw/first/;
 use Test::Deep::NoTest qw/eq_deeply/;
 use namespace::clean;
@@ -38,9 +37,9 @@ sub _instantiate_shadow_row {
   my $shadow_rsrc = $rsrc->related_source($shadows_rel);
 
   # this is so a multi-operation appears to have happened at the same time
-  # (maybe this is a bad idea)
+  # (FIXME - maybe this is a bad idea???)
   # (( but it rocks for testing ))
-  local $schema->{_shadow_changeset_timestamp} = sprintf ("%d%06d", gettimeofday())
+  local $schema->{_shadow_changeset_timestamp} = $schema->shadow_timestamp
     unless $schema->{_shadow_changeset_timestamp};
 
   my $self_rs;
@@ -65,6 +64,9 @@ sub _instantiate_shadow_row {
       );
     } @{$self->shadow_columns} ),
   });
+
+  $new_shadow->set_from_related( changeset => $schema->{_shadow_changeset_rowobj} )
+    if $schema->{_shadow_changeset_rowobj};
 
   for my $sh_rel ($shadow_rsrc->relationships) {
     my $relinfo = $shadow_rsrc->relationship_info($sh_rel);
@@ -231,7 +233,7 @@ sub update {
         my $new_shadow_vals = { $sh->get_columns };
         my $rsrc = $sh->result_source;
         my @check_cols = grep
-          { $_ !~ /^(?: shadow_id | shadow_timestamp | shadow_stage )$/x }
+          { $_ !~ /^(?: shadow_id | shadow_timestamp | shadow_stage | shadow_changeset_id )$/x }
           $rsrc->columns
         ;
         if (my @literals = grep { ref $new_shadow_vals->{$_} } @check_cols ) {
@@ -275,7 +277,7 @@ sub delete {
 
   ### FIXME FIXME FIXME
   ### This only works because we do not have sqlite-side cascading
-  ### dlete() will not be called on rows that are deleted by rdbms
+  ### delete() will not be called on rows that are deleted by rdbms
   ### side triggers, we need to walk the tree ourselves *before*
   ### we issue the 1st delete
   ### Even then - if we do not shadow a particular "master" table

@@ -9,16 +9,134 @@ use Try::Tiny;
 
 use List::Util qw/first/;
 use List::UtilsBy qw/sort_by/;
+use Time::HiRes qw/gettimeofday/;
+use Context::Preserve qw/preserve_context/;
 
 use namespace::clean;
 
-__PACKAGE__->mk_group_accessors (inherited => qw/shadow_result_base_class shadow_resultset_base_class/);
+__PACKAGE__->mk_group_accessors (component_class => qw/
+  shadow_result_base_class
+  shadow_resultset_base_class
+/);
+__PACKAGE__->mk_group_accessors (inherited => qw/
+  shadow_timestamp_datatype
+  _shadow_changeset_resultclass
+  _shadow_changeset_resultclass_valid
+/);
+
+# a user may want to change this if shadow_timestamp() is overriden
+__PACKAGE__->shadow_timestamp_datatype('bigint');
+
 __PACKAGE__->shadow_result_base_class('DBIx::Class::Shadow::Result');
 __PACKAGE__->shadow_resultset_base_class('DBIx::Class::Shadow::ResultSet');
 
 my $shadow_suffix = '::Shadow';
 my $row_shadows_relname = 'shadows';
 my $shadow_result_component = 'DBIx::Class::Shadow';
+
+sub shadow_timestamp {
+  # Use a combined value of epoch and zero-padded sub-second
+  # time in units of *0.1 millisecond*.
+  # The reason for this  is that a perl compiled with 32bit
+  # ints (most 32bit machines, check $Config{ivsize} < 8) can
+  # not handle more than 15 decimal digit numbers without
+  # losing a significant amount of precision (this is a side
+  # effect of perl using doubles to do most numeric ops, which
+  # gives a rough limit of +- 2^52 on most current hardware).
+  # In particular this affects DBI since most DBD drivers
+  # transport numerics as numbers, not as strings, hence even
+  # if we manage to write the right thing to the database, we
+  # are not guaranteed to be able to read it out correctly.
+  # Given how epoch will stay in the range of 10 digits
+  # (2^31 - 1) for a while, we add extra 4 digits to stay far
+  # from the limits imposed by perl
+  # (also I dare anyone to insert at close to 10,000qps
+  # even with massive parallelism and clustering)
+  my @t = gettimeofday();
+  return sprintf ("%d%04d", $t[0], int($t[1]/100) );
+}
+
+sub changeset_do {
+  my $self = shift;
+  my $code = shift;
+
+  $self->throw_exception ('Expecting coderef as first argument')
+    unless ref $code eq 'CODE';
+
+  my $cset_class = $self->shadow_changeset_resultclass
+    or $self->throw_exception(
+      'changeset_do() can not be used without setting a shadow_changeset_resultclass'
+    );
+
+  my $cset_rsrc = $self->source($cset_class)
+    or $self->throw_exception(
+      "Resultclass $cset_class does not seem to be registered with this schema"
+    );
+
+  my $parent_cset = $self->{_shadow_changeset_rowobj};
+
+  my $guard = $self->txn_scope_guard
+    unless $parent_cset;
+
+  local $self->{_shadow_changeset_rowobj};
+
+  my $cset = $self->{_shadow_changeset_rowobj} = $cset_rsrc->resultset->new_result({});
+
+  local $self->{_shadow_changeset_timestamp} = $self->shadow_timestamp
+    unless $self->{_shadow_changeset_timestamp};
+
+  $cset->set_timestamp ($self->{_shadow_changeset_timestamp});
+  $cset->nest_changeset($parent_cset)
+    if $parent_cset;
+
+  $cset->insert;
+
+  return preserve_context( \&$code, after => sub { $guard->commit } )
+    if $guard;
+
+  return $code->();
+}
+
+sub shadow_changeset_resultclass {
+  my $self = shift;
+  if (@_) {
+    $self->_shadow_changeset_resultclass_valid(undef);
+    return $self->_shadow_changeset_resultclass(@_);
+  }
+
+  if (
+    ! $self->_shadow_changeset_resultclass_valid
+      and
+    my $c = $self->_shadow_changeset_resultclass
+  ) {
+    $self->ensure_class_loaded($c);
+
+    $self->throw_exception("Changeset class $c does not look like a Result class")
+      unless $c->isa('DBIx::Class::Row');
+
+    my @pk = $c->primary_columns;
+    $self->throw_exception("Changeset resultclass $c does not have a primary key column 'id'")
+      unless (
+        $c->has_column('id')
+          and
+        @pk == 1
+          and
+        $pk[0] eq 'id'
+      );
+
+    $self->throw_exception("Changeset resultclass $c must have an integer (INT) primary key column")
+      unless $c->column_info('id')->{data_type} =~ /^ int(?:eger)? $/ix;
+
+    for (qw/set_timestamp nest_changeset/) {
+      $self->throw_exception("Changeset resultclass $c does not provide a '$_' method")
+        unless $c->can($_);
+    }
+
+    $self->_shadow_changeset_resultclass_valid(1);
+  }
+
+  return $self->_shadow_changeset_resultclass;
+}
 
 sub register_class {
   my ($self, $moniker, $res_class) = @_;
@@ -44,6 +162,20 @@ sub register_class {
         $self->throw_exception($_) if $requested_relationships;
         #warn "$_";
       };
+    }
+
+    # see if we need to link a changeset
+    # we do it here, because we do not have access to $moniker anywhere else
+    if (my $cset_class = $self->shadow_changeset_resultclass) {
+      $shadow_class->belongs_to(changeset => $cset_class, 'shadow_changeset_id', {
+        join_type => 'left', on_delete => 'restrict', on_update => 'cascade'
+      });
+
+      my $cset_sh_relname = lc $moniker;
+      $cset_sh_relname =~ s/:+/_/g;
+      $cset_sh_relname .= '_shadows';
+      $cset_class->has_many( $cset_sh_relname => $shadow_class, 'shadow_changeset_id');
+      $self->_reapply_source_prototype($cset_class);
     }
 
     $self->register_class($moniker . $shadow_suffix, $shadow_class);
@@ -83,7 +215,6 @@ sub _gen_shadow_source {
     $self->throw_exception("Unable to shadow $res_class - non-scalar table names are not supported")
       if ref $res_table;
 
-    $self->ensure_class_loaded($self->shadow_result_base_class);
     $self->inject_base($shadow_class, $self->shadow_result_base_class);
     $shadow_class->table('shadow_' . $res_table);
     $shadow_class->resultset_class($self->shadow_resultset_base_class);
@@ -107,10 +238,17 @@ sub _gen_shadow_source {
 
     $shadow_class->add_columns(
       shadow_id => { data_type => 'INT', is_auto_increment => 1 },
-      shadow_timestamp => { data_type => 'BIGINT' }, # sprintf "%d%06d", Time::HiRes::gettimeofday()
-                                                     # as high as 2,147,483,647,999,999 (higher after 2038)
-                                                     # hence bigint
-      shadow_stage => { data_type => 'TINYINT' }, # 2 - insertion, 1 - update, 0 - deletion
+
+      shadow_timestamp => { data_type => $self->shadow_timestamp_datatype },
+
+      # 2 - insertion, 1 - update, 0 - deletion
+      shadow_stage => { data_type => 'TINYINT' },
+
+      # always create this column, even if changesetting has not been requested
+      # it most likely will be requested later on, and changing the shadow
+      # schema just for this will blow
+      shadow_changeset_id =>  { data_type => 'INT', is_nullable => 1 },
+
       shadowed_lifecycle => { data_type => 'INT', retrieve_on_insert => 1 },
       (map {( "shadowed_curpk_$_" => { %{$columns_info->{$_}}, is_nullable => 1 } )} @pks),
       $self->_sort_colhash( { map
@@ -155,6 +293,7 @@ sub _gen_shadow_source {
     $res_class->has_many($row_shadows_relname => $shadow_class, $self->_hash_for_rel({ reverse %$current_belongs_to}),
       { cascade_delete => 0 }, # FIXME - need to think what to do about cascade_copy - not clear-cut
     );
+
   }
 
   return $shadow_class
@@ -237,7 +376,7 @@ sub _gen_shadow_relationship {
           is_nullable => $optional_belongs_to ? 1 : 0
         },
       );
-      $self->_reapply_source_prototype($our_shadow->result_source_instance);
+      $self->_reapply_source_prototype($our_shadow);
     }
 
     $shadow_rel_cond = { 'foreign.shadowed_lifecycle' => "self.${foreign_id_col}" };
@@ -263,7 +402,7 @@ sub _gen_shadow_relationship {
       $foreign_shadow->add_column(
         $our_id_fk_col => { data_type => 'INT', retrieve_on_insert => 1 }
       );
-      $self->_reapply_source_prototype($foreign_shadow->result_source_instance);
+      $self->_reapply_source_prototype($foreign_shadow);
     }
 
     $shadow_rel_cond = { "foreign.${our_id_fk_col}" => 'self.shadowed_lifecycle' };
@@ -295,13 +434,17 @@ sub _gen_shadow_relationship {
 # However it *may* fuck up something else that hooks register_source
 # as it effectively will re-execute quite a lot
 sub _reapply_source_prototype {
-  my ($self, $modified_source_instance) = @_;
+  my ($self, $modified_source) = @_;
 
-  my $result_class = $modified_source_instance->result_class;
+  my $result_class = ref $modified_source
+    ? $modified_source->result_class
+    : $modified_source
+  ;
+
   for my $moniker ($self->sources) {
     if ($self->class($moniker) eq $result_class) {
       $self->unregister_source($moniker);
-      $self->register_source($moniker, $modified_source_instance);
+      $self->register_source($moniker, ref $modified_source ? $modified_source : $result_class->result_source_instance);
     }
   }
 }

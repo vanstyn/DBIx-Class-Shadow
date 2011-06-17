@@ -7,7 +7,7 @@ use base qw/DBIx::Class::Schema/;
 __PACKAGE__->load_components(qw/Schema::Shadow/);
 
 __PACKAGE__->shadow_result_base_class( 'DBICTest::S::BaseShadowResult' );
-#__PACKAGE__->shadow_changeset_result( 'DBIC::ShadowTest::Result::Changeset' );
+__PACKAGE__->shadow_changeset_resultclass( 'DBICTest::S::Result::Changeset' );
 
 __PACKAGE__->load_namespaces;
 

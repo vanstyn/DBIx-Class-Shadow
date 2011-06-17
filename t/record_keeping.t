@@ -26,10 +26,17 @@ is_deeply (
     },
     'Config::Shadow' => {
       current_version => {qw/foreign.id                         self.shadowed_curpk_id/},
+      changeset       => {qw/foreign.id                           self.shadow_changeset_id/},
       older_shadows   => '_CUSTOM_',
       newer_shadows   => '_CUSTOM_',
     },
-    'Changeset' => {},
+    'Changeset' => {
+      parent_changeset => {qw/foreign.id self.parent_changeset_id/},
+      map
+        {( "${_}_shadows" => {qw/foreign.shadow_changeset_id self.id/} )}
+        qw/config artist cd track/
+      ,
+    },
     'Artist' => {
       cds       => {qw/foreign.artist_name          self.name/},
       paintings => {qw/foreign.artist_name          self.name/},
@@ -37,6 +44,7 @@ is_deeply (
     },
     'Artist::Shadow' => {
       current_version => {qw/foreign.name                         self.shadowed_curpk_name/},
+      changeset       => {qw/foreign.id                           self.shadow_changeset_id/},
       older_shadows   => '_CUSTOM_',
       newer_shadows   => '_CUSTOM_',
       cds_shadows     => {qw/foreign.rel_shadow_artists_lifecycle self.shadowed_lifecycle/},
@@ -51,6 +59,7 @@ is_deeply (
     },
     'CD::Shadow' => {
       current_version       => {qw/foreign.id                        self.shadowed_curpk_id/},
+      changeset             => {qw/foreign.id                           self.shadow_changeset_id/},
       older_shadows         => '_CUSTOM_',
       newer_shadows         => '_CUSTOM_',
       artist_shadows        => {qw/foreign.shadowed_lifecycle        self.rel_shadow_artists_lifecycle/},
@@ -70,6 +79,7 @@ is_deeply (
     'Track::Shadow' => {
       current_version   => {qw/foreign.cd_id                        self.shadowed_curpk_cd_id
                                foreign.position                     self.shadowed_curpk_position/},
+      changeset         => {qw/foreign.id                           self.shadow_changeset_id/},
       older_shadows     => '_CUSTOM_',
       newer_shadows     => '_CUSTOM_',
       cd_shadows        => {qw/foreign.shadowed_lifecycle           self.rel_shadow_cds_lifecycle/},
@@ -149,8 +159,10 @@ for ($s->resultset('Track')->search({ position => 1 })) {
   $s->{_shadow_changeset_timestamp}++ if $_->position > 1;
 }
 
-note('delete the 1st track off each cd of the 1st artist');
-$a_gaga->cds->search_related('tracks', { position => 1 })->delete_all;
+note('delete the 1st track off each cd of the 1st artist in a changeset');
+$s->changeset_do( sub {
+  $a_gaga->cds->search_related('tracks', { position => 1 })->delete_all;
+});
 $s->{_shadow_changeset_timestamp}++;
 
 note('add aliases to artists');
@@ -172,12 +184,16 @@ note('change the 3rd artist name');
 $a_snatch->update({ name => 'very_sneaky', alias => 'SNEAK-er' });
 $s->{_shadow_changeset_timestamp}++;
 
-note('retitle all cds');
-$_->update({ title => $_->title . '(tm)' }) for $s->resultset('CD')->all;
-$s->{_shadow_changeset_timestamp}++;
+note('retitle all cds in a changeset');
+$s->changeset_do(sub {
+  $_->update({ title => $_->title . '(tm)' }) for $s->resultset('CD')->all;
+  $s->{_shadow_changeset_timestamp}++;
 
-note('delete the other 2 artists');
-$s->resultset('Artist')->search({ name => { '!=', 'very_sneaky' }})->delete_all;
+  note('delete the other 2 artists in a nested changeset');
+  $s->changeset_do(sub {
+    $s->resultset('Artist')->search({ name => { '!=', 'very_sneaky' }})->delete_all;
+  });
+});
 $s->{_shadow_changeset_timestamp}++;
 
 #use Data::Dumper::Concise;
@@ -203,13 +219,16 @@ is_deeply(
   $s_state,
   {
     Changeset => [
-      [qw/  id    timestamp     user_id session_id caller /],
+      [qw/  id    timestamp user_id session_id  parent_changeset_id /],
+      [qw/  1     675       0       0           _UNDEF_             /],
+      [qw/  2     681       0       0           _UNDEF_             /],
+      [qw/  3     682       0       0           2                   /],
     ],
     Config => [
       [qw/  id    key           value /],
     ],
     'Config::Shadow' => [
-      [qw/  shadow_id shadow_timestamp  shadow_stage  shadowed_lifecycle  shadowed_curpk_id shadow_val_id shadow_val_key shadow_val_value  /],
+      [qw/  shadow_id shadow_timestamp  shadow_stage  shadow_changeset_id shadowed_lifecycle  shadowed_curpk_id shadow_val_id shadow_val_key shadow_val_value  /],
     ],
     Painting => [ # never tracked - nothing left
       [qw/  id    artist_name   title /],
@@ -219,16 +238,16 @@ is_deeply(
       [qw/  very_sneaky   SNEAK-er    /],
     ],
     'Artist::Shadow' => [
-      [qw/  shadow_id shadow_timestamp  shadow_stage  shadowed_lifecycle  shadowed_curpk_name shadow_val_name shadow_val_alias  /],
-      [qw/  1         666               2             1                   _UNDEF_             gaga            _UNDEF_           /],
-      [qw/  2         667               1             1                   _UNDEF_             the_laaaadyyyy  _UNDEF_           /],
-      [qw/  3         670               2             2                   _UNDEF_             pink            _UNDEF_           /],
-      [qw/  4         676               1             1                   _UNDEF_             the_laaaadyyyy  Number_1          /],
-      [qw/  5         677               1             2                   _UNDEF_             pink            Number_2          /],
-      [qw/  6         678               2             3                   very_sneaky         sneaky          _UNDEF_           /],
-      [qw/  7         680               1             3                   very_sneaky         very_sneaky     SNEAK-er          /],
-      [qw/  8         682               0             1                   _UNDEF_             the_laaaadyyyy  Number_1          /],
-      [qw/  9         682               0             2                   _UNDEF_             pink            Number_2          /],
+      [qw/  shadow_id shadow_timestamp  shadow_stage  shadow_changeset_id shadowed_lifecycle  shadowed_curpk_name shadow_val_name shadow_val_alias  /],
+      [qw/  1         666               2             _UNDEF_             1                   _UNDEF_             gaga            _UNDEF_           /],
+      [qw/  2         667               1             _UNDEF_             1                   _UNDEF_             the_laaaadyyyy  _UNDEF_           /],
+      [qw/  3         670               2             _UNDEF_             2                   _UNDEF_             pink            _UNDEF_           /],
+      [qw/  4         676               1             _UNDEF_             1                   _UNDEF_             the_laaaadyyyy  Number_1          /],
+      [qw/  5         677               1             _UNDEF_             2                   _UNDEF_             pink            Number_2          /],
+      [qw/  6         678               2             _UNDEF_             3                   very_sneaky         sneaky          _UNDEF_           /],
+      [qw/  7         680               1             _UNDEF_             3                   very_sneaky         very_sneaky     SNEAK-er          /],
+      [qw/  8         682               0             3                   1                   _UNDEF_             the_laaaadyyyy  Number_1          /],
+      [qw/  9         682               0             3                   2                   _UNDEF_             pink            Number_2          /],
     ],
     CD => [
       [qw/  id  artist_name   title             single_track_cdid single_track_pos    /],
@@ -236,22 +255,22 @@ is_deeply(
       [qw/  5   very_sneaky   barry_o'bama(tm)  _UNDEF_           _UNDEF_             /],
     ],
     'CD::Shadow' => [
-      [qw/  shadow_id shadow_timestamp  shadow_stage  shadowed_lifecycle  shadowed_curpk_id shadow_val_title        rel_shadow_artists_lifecycle  rel_shadow_tracks_lifecycle /],
-      [qw/  1         666               2             1                   _UNDEF_           twist                   1                             _UNDEF_                     /],
-      [qw/  2         666               2             2                   _UNDEF_           stab                    1                             _UNDEF_                     /],
-      [qw/  3         669               2             3                   3                 unplugged               1                             4                           /],
-      [qw/  4         670               2             4                   _UNDEF_           still_a_"rockstar"      2                             _UNDEF_                     /],
-      [qw/  5         670               2             5                   5                 barry_o'bama            2                             9                           /],
-      [qw/  6         679               1             3                   3                 unplugged               3                             4                           /],
-      [qw/  7         679               1             5                   5                 barry_o'bama            3                             9                           /],
-      [qw/  8         681               1             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
-      [qw/  9         681               1             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
-      [qw/  10        681               1             3                   3                 unplugged(tm)           3                             4                           /],
-      [qw/  11        681               1             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
-      [qw/  12        681               1             5                   5                 barry_o'bama(tm)        3                             9                           /],
-      [qw/  13        682               0             2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
-      [qw/  14        682               0             1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
-      [qw/  15        682               0             4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
+      [qw/  shadow_id shadow_timestamp  shadow_stage  shadow_changeset_id shadowed_lifecycle  shadowed_curpk_id shadow_val_title        rel_shadow_artists_lifecycle  rel_shadow_tracks_lifecycle /],
+      [qw/  1         666               2             _UNDEF_             1                   _UNDEF_           twist                   1                             _UNDEF_                     /],
+      [qw/  2         666               2             _UNDEF_             2                   _UNDEF_           stab                    1                             _UNDEF_                     /],
+      [qw/  3         669               2             _UNDEF_             3                   3                 unplugged               1                             4                           /],
+      [qw/  4         670               2             _UNDEF_             4                   _UNDEF_           still_a_"rockstar"      2                             _UNDEF_                     /],
+      [qw/  5         670               2             _UNDEF_             5                   5                 barry_o'bama            2                             9                           /],
+      [qw/  6         679               1             _UNDEF_             3                   3                 unplugged               3                             4                           /],
+      [qw/  7         679               1             _UNDEF_             5                   5                 barry_o'bama            3                             9                           /],
+      [qw/  8         681               1             2                   2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
+      [qw/  9         681               1             2                   1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
+      [qw/  10        681               1             2                   3                   3                 unplugged(tm)           3                             4                           /],
+      [qw/  11        681               1             2                   4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
+      [qw/  12        681               1             2                   5                   5                 barry_o'bama(tm)        3                             9                           /],
+      [qw/  13        682               0             3                   2                   _UNDEF_           stab(tm)                1                             _UNDEF_                     /],
+      [qw/  14        682               0             3                   1                   _UNDEF_           twist(tm)               1                             _UNDEF_                     /],
+      [qw/  15        682               0             3                   4                   _UNDEF_           still_a_"rockstar"(tm)  2                             _UNDEF_                     /],
     ],
     Track => [
       [qw/  cd_id title             position  /],
@@ -259,53 +278,53 @@ is_deeply(
       [qw/  5     mr_44             1         /],
     ],
     'Track::Shadow' => [
-      [qw/  shadow_id shadow_timestamp  shadow_stage  shadowed_lifecycle  shadowed_curpk_cd_id  shadowed_curpk_position shadow_val_title  shadow_val_position rel_shadow_cds_lifecycle/],
-      [qw/  1         666               2             1                   _UNDEF_               _UNDEF_                 star_of_david     3                   1                       /],
-      [qw/  2         666               2             2                   _UNDEF_               _UNDEF_                 flathead          2                   1                       /],
-      [qw/  3         666               2             3                   _UNDEF_               _UNDEF_                 phillips          1                   1                       /],
-      [qw/  4         666               2             4                   _UNDEF_               _UNDEF_                 crappy_plunger    3                   2                       /],
-      [qw/  5         666               2             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   2                   2                       /],
-      [qw/  6         666               2             6                   _UNDEF_               _UNDEF_                 rusty_spoon       1                   2                       /],
-      [qw/  7         668               1             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   3                   2                       /],
-      [qw/  8         669               2             7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
-      [qw/  9         669               2             8                   3                     1                       unclogging_action 1                   3                       /],
-      [qw/  10        670               2             9                   _UNDEF_               _UNDEF_                 dear_mr_president 2                   4                       /],
-      [qw/  11        670               2             10                  5                     1                       mr_44             1                   5                       /],
-      [qw/  12        670               2             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   1                   4                       /],
-      [qw/  13        671               1             6                   _UNDEF_               _UNDEF_                 rusty_spoon       0                   2                       /],
-      [qw/  14        671               1             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   1                   2                       /],
-      [qw/  15        671               1             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   2                   2                       /],
-      [qw/  16        671               1             6                   _UNDEF_               _UNDEF_                 rusty_spoon       3                   2                       /],
-      [qw/  17        672               1             3                   _UNDEF_               _UNDEF_                 phillips          0                   1                       /],
-      [qw/  18        672               1             2                   _UNDEF_               _UNDEF_                 flathead          1                   1                       /],
-      [qw/  19        672               1             1                   _UNDEF_               _UNDEF_                 star_of_david     2                   1                       /],
-      [qw/  20        672               1             3                   _UNDEF_               _UNDEF_                 phillips          3                   1                       /],
-      [qw/  21        673               1             8                   3                     1                       unclogging_action 0                   3                       /],
-      [qw/  22        673               1             7                   _UNDEF_               _UNDEF_                 hardcore_suction  1                   3                       /],
-      [qw/  23        673               1             8                   3                     1                       unclogging_action 2                   3                       /],
-      [qw/  24        674               1             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   0                   4                       /],
-      [qw/  25        674               1             9                   _UNDEF_               _UNDEF_                 dear_mr_president 1                   4                       /],
-      [qw/  26        674               1             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   2                   4                       /],
-      [qw/  27        675               1             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   0                   2                       /],
-      [qw/  28        675               1             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   1                   2                       /],
-      [qw/  29        675               1             6                   _UNDEF_               _UNDEF_                 rusty_spoon       2                   2                       /],
-      [qw/  30        675               1             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   3                   2                       /],
-      [qw/  31        675               0             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   3                   2                       /],
-      [qw/  32        675               1             2                   _UNDEF_               _UNDEF_                 flathead          0                   1                       /],
-      [qw/  33        675               1             1                   _UNDEF_               _UNDEF_                 star_of_david     1                   1                       /],
-      [qw/  34        675               1             3                   _UNDEF_               _UNDEF_                 phillips          2                   1                       /],
-      [qw/  35        675               1             2                   _UNDEF_               _UNDEF_                 flathead          3                   1                       /],
-      [qw/  36        675               0             2                   _UNDEF_               _UNDEF_                 flathead          3                   1                       /],
-      [qw/  37        675               1             7                   _UNDEF_               _UNDEF_                 hardcore_suction  0                   3                       /],
-      [qw/  38        675               1             8                   3                     1                       unclogging_action 1                   3                       /],
-      [qw/  39        675               1             7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
-      [qw/  40        675               0             7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
-      [qw/  41        682               0             6                   _UNDEF_               _UNDEF_                 rusty_spoon       2                   2                       /],
-      [qw/  42        682               0             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   1                   2                       /],
-      [qw/  43        682               0             3                   _UNDEF_               _UNDEF_                 phillips          2                   1                       /],
-      [qw/  44        682               0             1                   _UNDEF_               _UNDEF_                 star_of_david     1                   1                       /],
-      [qw/  45        682               0             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   2                   4                       /],
-      [qw/  46        682               0             9                   _UNDEF_               _UNDEF_                 dear_mr_president 1                   4                       /],
+      [qw/  shadow_id shadow_timestamp  shadow_stage  shadow_changeset_id shadowed_lifecycle  shadowed_curpk_cd_id  shadowed_curpk_position shadow_val_title  shadow_val_position rel_shadow_cds_lifecycle/],
+      [qw/  1         666               2             _UNDEF_             1                   _UNDEF_               _UNDEF_                 star_of_david     3                   1                       /],
+      [qw/  2         666               2             _UNDEF_             2                   _UNDEF_               _UNDEF_                 flathead          2                   1                       /],
+      [qw/  3         666               2             _UNDEF_             3                   _UNDEF_               _UNDEF_                 phillips          1                   1                       /],
+      [qw/  4         666               2             _UNDEF_             4                   _UNDEF_               _UNDEF_                 crappy_plunger    3                   2                       /],
+      [qw/  5         666               2             _UNDEF_             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   2                   2                       /],
+      [qw/  6         666               2             _UNDEF_             6                   _UNDEF_               _UNDEF_                 rusty_spoon       1                   2                       /],
+      [qw/  7         668               1             _UNDEF_             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   3                   2                       /],
+      [qw/  8         669               2             _UNDEF_             7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
+      [qw/  9         669               2             _UNDEF_             8                   3                     1                       unclogging_action 1                   3                       /],
+      [qw/  10        670               2             _UNDEF_             9                   _UNDEF_               _UNDEF_                 dear_mr_president 2                   4                       /],
+      [qw/  11        670               2             _UNDEF_             10                  5                     1                       mr_44             1                   5                       /],
+      [qw/  12        670               2             _UNDEF_             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   1                   4                       /],
+      [qw/  13        671               1             _UNDEF_             6                   _UNDEF_               _UNDEF_                 rusty_spoon       0                   2                       /],
+      [qw/  14        671               1             _UNDEF_             5                   _UNDEF_               _UNDEF_                 lethal_umbrella   1                   2                       /],
+      [qw/  15        671               1             _UNDEF_             4                   _UNDEF_               _UNDEF_                 sparkly_plunger   2                   2                       /],
+      [qw/  16        671               1             _UNDEF_             6                   _UNDEF_               _UNDEF_                 rusty_spoon       3                   2                       /],
+      [qw/  17        672               1             _UNDEF_             3                   _UNDEF_               _UNDEF_                 phillips          0                   1                       /],
+      [qw/  18        672               1             _UNDEF_             2                   _UNDEF_               _UNDEF_                 flathead          1                   1                       /],
+      [qw/  19        672               1             _UNDEF_             1                   _UNDEF_               _UNDEF_                 star_of_david     2                   1                       /],
+      [qw/  20        672               1             _UNDEF_             3                   _UNDEF_               _UNDEF_                 phillips          3                   1                       /],
+      [qw/  21        673               1             _UNDEF_             8                   3                     1                       unclogging_action 0                   3                       /],
+      [qw/  22        673               1             _UNDEF_             7                   _UNDEF_               _UNDEF_                 hardcore_suction  1                   3                       /],
+      [qw/  23        673               1             _UNDEF_             8                   3                     1                       unclogging_action 2                   3                       /],
+      [qw/  24        674               1             _UNDEF_             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   0                   4                       /],
+      [qw/  25        674               1             _UNDEF_             9                   _UNDEF_               _UNDEF_                 dear_mr_president 1                   4                       /],
+      [qw/  26        674               1             _UNDEF_             11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   2                   4                       /],
+      [qw/  27        675               1             1                   5                   _UNDEF_               _UNDEF_                 lethal_umbrella   0                   2                       /],
+      [qw/  28        675               1             1                   4                   _UNDEF_               _UNDEF_                 sparkly_plunger   1                   2                       /],
+      [qw/  29        675               1             1                   6                   _UNDEF_               _UNDEF_                 rusty_spoon       2                   2                       /],
+      [qw/  30        675               1             1                   5                   _UNDEF_               _UNDEF_                 lethal_umbrella   3                   2                       /],
+      [qw/  31        675               0             1                   5                   _UNDEF_               _UNDEF_                 lethal_umbrella   3                   2                       /],
+      [qw/  32        675               1             1                   2                   _UNDEF_               _UNDEF_                 flathead          0                   1                       /],
+      [qw/  33        675               1             1                   1                   _UNDEF_               _UNDEF_                 star_of_david     1                   1                       /],
+      [qw/  34        675               1             1                   3                   _UNDEF_               _UNDEF_                 phillips          2                   1                       /],
+      [qw/  35        675               1             1                   2                   _UNDEF_               _UNDEF_                 flathead          3                   1                       /],
+      [qw/  36        675               0             1                   2                   _UNDEF_               _UNDEF_                 flathead          3                   1                       /],
+      [qw/  37        675               1             1                   7                   _UNDEF_               _UNDEF_                 hardcore_suction  0                   3                       /],
+      [qw/  38        675               1             1                   8                   3                     1                       unclogging_action 1                   3                       /],
+      [qw/  39        675               1             1                   7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
+      [qw/  40        675               0             1                   7                   _UNDEF_               _UNDEF_                 hardcore_suction  2                   3                       /],
+      [qw/  41        682               0             3                   6                   _UNDEF_               _UNDEF_                 rusty_spoon       2                   2                       /],
+      [qw/  42        682               0             3                   4                   _UNDEF_               _UNDEF_                 sparkly_plunger   1                   2                       /],
+      [qw/  43        682               0             3                   3                   _UNDEF_               _UNDEF_                 phillips          2                   1                       /],
+      [qw/  44        682               0             3                   1                   _UNDEF_               _UNDEF_                 star_of_david     1                   1                       /],
+      [qw/  45        682               0             3                   11                  _UNDEF_               _UNDEF_                 more_a_*ockstar   2                   4                       /],
+      [qw/  46        682               0             3                   9                   _UNDEF_               _UNDEF_                 dear_mr_president 1                   4                       /],
     ]
   },
   'Schema state as expected after manipulations',
