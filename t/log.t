@@ -106,21 +106,33 @@ use Term::ANSIColor;
 use DateTime;
 
 my @data;
+my $date_formatter = sub {
+   my $date = shift;
+   substr $date, -4,0,'.';
+
+   my $dt = DateTime->from_epoch( epoch => $date );
+   my $micro = $dt->microsecond;
+   $micro =~ s/^(\d{3}).*$/$1/;
+   sprintf '%s %s.%i', $dt->ymd, $dt->hms, $micro;
+};
 my $logtool = sub {
    my ($rs, $item) = @_;
-
    while (my $d = $rs->next) {
+      my $str = $date_formatter->($d->shadow_timestamp);
       my $out = '';
       my ($action, $l, $r) = $d->as_diff;
       if ($action eq 'insert') {
          $out .= color 'green';
+         $out .= "   $str\n";
          $out .= " + Created $item: " . $d->as_result->render . "\n";
       } elsif ($action eq 'delete') {
          $out .= color 'red';
+         $out .= "   $str\n";
          $out .= " - Deleted $item: " . $d->as_result->render . "\n";
       } else {
          my $t = $collapse->($l, $r);
          $out .= color 'yellow';
+         $out .= "   $str\n";
          $out .= "   Updated $item: " . $d->as_result->render_delta($t) . "\n";
       }
       $out .= color 'reset';
@@ -132,4 +144,4 @@ $logtool->($artists, 'artist');
 $logtool->($cds, 'CD');
 $logtool->($s->resultset('Track::Shadow'), 'track');
 
-print join "\n", map "$_->[0]\n$_->[1]", sort { $a->[0] <=> $b->[0] } @data;
+print join "\n", map $_->[1], sort { $a->[0] <=> $b->[0] } @data;
