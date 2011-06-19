@@ -108,9 +108,9 @@ returns a list of
 
 Returns the next newer shadow after this one
 
-=head2 prev
+=head2 previous
 
- $shadow->prev
+ $shadow->previous
 
 Returns the next older shadow before this one
 
