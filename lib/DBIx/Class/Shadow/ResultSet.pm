@@ -86,3 +86,82 @@ sub updates { shift->$stage(1) }
 sub deletes { shift->$stage(0) }
 
 1;
+
+=head1 NAME
+
+DBIx::Class::Shadow::ResultSet
+
+=head1 DESCRIPTION
+
+This package is the (default) base class for all generated shadow classes'
+ResultSet classes.  The methods defined are thus available when you access any
+form of shadow resultset.
+
+=head1 METHODS
+
+=head2 last_shadow_rs
+
+Returns a resultset containing the newest shadow
+
+=head2 version
+
+ $rs->version(4);
+
+Returns a resultset containing the fourth shadow, where the first is the oldest
+
+=head2 after
+
+ $rs->after(
+   version => 4,
+ );
+
+ $rs->after(
+   datetime => $datetime_object,
+ );
+
+ $rs->after(
+   changeset => $changeset_id,
+ );
+
+ $rs->after(
+   changeset_datetime => $datetime,
+ );
+
+=head2 before
+
+ $rs->before(
+   version => 4,
+ );
+
+ $rs->before(
+   datetime => $datetime_object,
+ );
+
+ $rs->before(
+   changeset => $changeset_id,
+ );
+
+ $rs->before(
+   changeset_datetime => $datetime,
+ );
+
+=head2 changeset
+
+=head2 groknik
+
+ $rs->groknik($column, $from, $to);
+
+Returns the specific shadow when C<$column> changed from C<$from> to C<$to>.
+
+=head2 inserts
+
+Returns a resultset with just inserts
+
+=head2 updates
+
+Returns a resultset with just updates
+
+=head2 deletes
+
+Returns a resultset with just deletes
+=cut

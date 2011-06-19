@@ -301,3 +301,58 @@ sub delete {
 }
 
 1;
+
+=head1 NAME
+
+DBIx::Class::Shadow - Flexible database auditing for the Perl ORM
+
+=head1 SYNOPSIS
+
+Add the schema component:
+
+ package MyApp::Schema;
+
+ use strict;
+ use warnings;
+
+ use base 'DBIx::Class::Schema';
+
+ __PACKAGE__->load_components('Schema::Shadow');
+
+ __PACKAGE__->load_namespaces;
+
+ 1;
+
+Add a result component:
+
+ package MyApp::Schema::Result::Artist;
+
+ use warnings;
+ use strict;
+
+ use base 'DBIx::Class::Core';
+ __PACKAGE__->load_components('Shadow');
+
+ ...
+
+ 1;
+
+=head1 DESCRIPTION
+
+C<DBIx::Class::Shadow> is a tool for auditing your database.  It can be used as
+a security measure to see who changed what and when, or it could be used as a
+safety harness if single transactions ever need to be rolled back.
+
+Note that this class specifically is for setting up shadowing per result.  To
+see the schema level configuration, see L<DBIx::Class::Schema::Shadow>.
+
+=head1 METHODS
+
+=head2 shadow_columns
+
+ __PACKAGE__->shadow_columns([qw( id name )]);
+
+C<shadow_columns> allows you to set which columns to audit.  The default is all
+of the columns.
+
+=cut

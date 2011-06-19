@@ -450,3 +450,60 @@ sub _reapply_source_prototype {
 }
 
 1;
+
+=head1 NAME
+
+DBIx::Class::Schema::Shadow
+
+=head1 METHODS
+
+=head2 changeset_do
+
+ $schema->changeset_do(sub {
+   ...
+ });
+
+=head2 shadow_result_base_class
+
+ __PACKAGE__->shadow_result_base_class('MyApp::Schema::Shadow::Result');
+
+C<shadow_result_base_class> sets the base class for the generated shadow
+results.
+
+# FIXME: Are there requirements for the base class?
+
+=head2 shadow_resultset_base_class
+
+ __PACKAGE__->shadow_resultset_base_class('MyApp::Schema::Shadow::ResultSet');
+
+C<shadow_resultset_base_class> sets the base class for the generated shadow
+resultsets.  Note that you should (but are not required to) base your custom
+resultset base on the default resultset, which is
+L<DBIx::Class::Shadow::ResultSet>.
+
+=head2 shadow_changeset_resultclass
+
+ __PACKAGE__->shadow_changeset_resultclass('MyApp::Schema::Result::Changeset');
+
+C<shadow_changeset_resultclass> is the class that stores information related to
+changesets.  By default this is merely a timestamp, but other obvious things to
+store would be a user_id and a session_id.  Note that the class must be a
+C<DBIx::Class::Row>, must have an C<id> column of type C<int>, and must provide
+C<set_timestamp> and C<nest_changeset> methods.
+
+=head2 shadow_timestamp
+
+You will probably never call this method, but what you may do instead is
+override it.  See, some databases, like SQLite and MySQL don't have subsecond
+precision in their DateTime columns, which is a huge problem for database
+auditing, so we just use a high precision unix time int to handle that.  But
+if you use a higher quality database that does have subsecond precision, you
+may want to consider making shadow_timestamp a real datetime.
+
+=head2 shadow_timestamp_datatype
+
+ __PACKAGE__->shadow_timestamp_datatype('DateTime')
+
+See L</shadow_timestamp> and make sure you set this appropriately.
+
+=cut

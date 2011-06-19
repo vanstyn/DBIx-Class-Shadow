@@ -57,10 +57,61 @@ sub previous {
 }
 
 sub next {
-   $_[0]->older_shadows->search(undef, {
+   $_[0]->newer_shadows->search(undef, {
       order_by => { -asc => 'shadow_id' },
       rows => 1,
    })->next
 }
 
 1;
+
+=head1 NAME
+
+DBIx::Class::Shadow::Result
+
+=head1 SYNOPSIS
+
+ my $artist = $schema->resultset('Artist')->find(1);
+ my $shadow = $artist->shadows->first;
+ my $artist_from_shadow = $shadow->as_result;
+
+=head1 DESCRIPTION
+
+This package is the (default) base class for all generated shadow classes.  The
+methods defined are thus available when you access any form of shadow object.
+
+=head1 METHODS
+
+=head2 as_result
+
+ $shadow->as_result
+
+Returns the given C<shadow> but with it's values inflated into the row that the
+shadow is based on, so that all the actual row methods are available, including
+relationships at shadowtime.
+
+# FIXME: I think the next three methods should be in a couple components
+
+=head2 as_diff
+
+ my ($action, $from, $to) = $shadow->as_diff
+
+returns a list of
+
+ action - ('insert', 'update', or 'delete')
+ from   - undef or a hashref representing state before action
+ to     - undef or a hashref representing state after action
+
+=head2 next
+
+ $shadow->next
+
+Returns the next newer shadow after this one
+
+=head2 prev
+
+ $shadow->prev
+
+Returns the next older shadow before this one
+
+=cut
