@@ -5,6 +5,9 @@ use strict;
 
 use base qw/DBIx::Class::ResultSet/;
 
+use Scalar::Util 'blessed';
+use Sub::Name;
+
 sub last_shadow_rs {
   shift->search_rs({ 'newer_shadows.shadow_id' => undef }, { join => 'newer_shadows' });
 }
@@ -15,14 +18,34 @@ sub version {
   })->slice($_[1] - 1)
 }
 
-sub after {
+my $super_epoch = sub {
+   my $ns = $_[0]->nanosecond;
+   $ns =~ s/^(\d\d\d).*/$1/;
+   $_[0]->epoch . $ns
+};
+
+sub after_version {
   $_[0]->search(undef, {
     order_by => 'shadow_id',
     offset   => $_[1],
   })
 }
 
-sub before {
+# FIXME: how are we going to handle people using a different type here?
+sub after_datetime {
+  my ($self, $dt) = @_;
+
+  $self->throw_exception('after datetime requires a datetime object!')
+    unless blessed($dt) && $dt->isa('DateTime');
+
+  $self->search({
+    shadow_timestamp => { '>' => $dt->$super_epoch },
+  }, {
+    order_by => 'shadow_id',
+  })
+}
+
+sub before_version {
   my $self = shift;
 
   my $version_query =
@@ -33,6 +56,37 @@ sub before {
    }, {
      order_by => { -desc => 'shadow_id' },
    })
+}
+
+sub before_datetime {
+  my ($self, $dt) = @_;
+
+  $self->throw_exception('before datetime requires a datetime object!')
+    unless blessed($dt) && $dt->isa('DateTime');
+
+  $self->search({
+    shadow_timestamp => { '<' => $dt->$super_epoch },
+  }, {
+    order_by => 'shadow_id',
+  })
+}
+
+{
+   my %map = (
+      version => 1,
+      datetime => 1,
+   );
+   no strict 'refs';
+   for my $meth (qw(before after)) {
+      *{$meth} = subname $meth => sub {
+         my ($self, $kind, $val) = @_;
+
+         if (exists $map{$kind}) {
+            my $m = "${meth}_$kind";
+            return $self->$m($val);
+         }
+      }
+   }
 }
 
 sub changeset {
