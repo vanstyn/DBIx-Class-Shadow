@@ -32,3 +32,11 @@ sub nest_changeset {
   my ($self, $parent) = @_;
   $self->set_from_related('parent_changeset', $parent);
 }
+
+sub new_changeset {
+   my ($class, $rsrc, $args) = @_;
+
+   $rsrc->resultset->new_result($args);
+}
+
+1;

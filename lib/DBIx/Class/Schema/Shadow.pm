@@ -58,7 +58,7 @@ sub shadow_timestamp {
 
 sub changeset_do {
   my $self = shift;
-  my $code = shift;
+  my ($args, $code) = (@_ == 2 ? @_ : {}, @_);
 
   $self->throw_exception ('Expecting coderef as first argument')
     unless ref $code eq 'CODE';
@@ -80,7 +80,11 @@ sub changeset_do {
 
   local $self->{_shadow_changeset_rowobj};
 
-  my $cset = $self->{_shadow_changeset_rowobj} = $cset_rsrc->resultset->new_result({});
+  $self->throw_exception(
+    'ChangeSet class must implement a new_changeset method'
+  ) unless $cset_class->can('new_changeset');
+
+  my $cset = $self->{_shadow_changeset_rowobj} = $cset_class->new_changeset($cset_rsrc, $args);
 
   local $self->{_shadow_changeset_timestamp} = $self->shadow_timestamp
     unless $self->{_shadow_changeset_timestamp};
