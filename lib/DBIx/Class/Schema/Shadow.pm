@@ -10,7 +10,6 @@ use Try::Tiny;
 use List::Util qw/first/;
 use List::UtilsBy qw/sort_by/;
 use Time::HiRes qw/gettimeofday/;
-use Context::Preserve qw/preserve_context/;
 
 use namespace::clean;
 
@@ -58,9 +57,9 @@ sub shadow_timestamp {
 
 sub changeset_do {
   my $self = shift;
-  my ($args, $code) = (@_ == 2 ? @_ : {}, @_);
+  my ($args, $code) = ref $_[0] eq 'CODE' ? ( {}, shift ) : (shift, shift );
 
-  $self->throw_exception ('Expecting coderef as first argument')
+  $self->throw_exception ('Expecting coderef as first (or second) argument')
     unless ref $code eq 'CODE';
 
   my $cset_class = $self->shadow_changeset_resultclass
@@ -75,30 +74,22 @@ sub changeset_do {
 
   my $parent_cset = $self->{_shadow_changeset_rowobj};
 
-  my $guard = $self->txn_scope_guard
-    unless $parent_cset;
-
   local $self->{_shadow_changeset_rowobj};
 
-  $self->throw_exception(
-    'ChangeSet class must implement a new_changeset method'
-  ) unless $cset_class->can('new_changeset');
+  $self->txn_do (sub {
+    my $cset = $self->{_shadow_changeset_rowobj} = $cset_class->new_changeset($cset_rsrc, $args);
 
-  my $cset = $self->{_shadow_changeset_rowobj} = $cset_class->new_changeset($cset_rsrc, $args);
+    local $self->{_shadow_changeset_timestamp} = $self->shadow_timestamp
+      unless $self->{_shadow_changeset_timestamp};
 
-  local $self->{_shadow_changeset_timestamp} = $self->shadow_timestamp
-    unless $self->{_shadow_changeset_timestamp};
+    $cset->set_timestamp ($self->{_shadow_changeset_timestamp});
+    $cset->nest_changeset($parent_cset)
+      if $parent_cset;
 
-  $cset->set_timestamp ($self->{_shadow_changeset_timestamp});
-  $cset->nest_changeset($parent_cset)
-    if $parent_cset;
+    $cset->insert;
 
-  $cset->insert;
-
-  return preserve_context( \&$code, after => sub { $guard->commit } )
-    if $guard;
-
-  return $code->();
+    $code->();
+  });
 }
 
 sub shadow_changeset_resultclass {
