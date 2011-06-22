@@ -175,7 +175,7 @@ sub update {
   # we need to walk the relationships and see if there is a
   # change on an *unshadowed* FK (it will not change our shadow
   # stored values, but *will* change the shadow linkage)
-  my $possible_duplicate;
+  my $relink_update;
   unless ($has_trackable_changes) {
     REL:
     for my $rel ($rsrc->relationships) {
@@ -195,7 +195,7 @@ sub update {
             # a shadow object, but we'll mark it for a check
             # before insertion
             $has_trackable_changes = 1;
-            $possible_duplicate = 1;
+            $relink_update = 1;
             last REL;
           }
         }
@@ -205,7 +205,7 @@ sub update {
 
   if ($has_trackable_changes) {
     my $sh = $self->_instantiate_shadow_row(
-      1,
+      ($relink_update ? -1 : 1),   # regular or internal update
       $rsrc->resultset
             ->search($self->ident_condition)
              ->search_related($shadows_rel, {}, { rows => 1 })
@@ -214,7 +214,7 @@ sub update {
     );
 
     $sh->{_possibly_duplicate_shadow} = 1
-      if $possible_duplicate;
+      if $relink_update;
 
     push @{$schema->{_shadow_changeset_rows}}, $sh;
   }

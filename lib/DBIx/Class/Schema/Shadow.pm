@@ -241,7 +241,7 @@ sub _gen_shadow_source {
 
       shadow_timestamp => { data_type => $self->shadow_timestamp_datatype },
 
-      # 2 - insertion, 1 - update, 0 - deletion
+      # 2 - insertion, 1 - update, 0 - deletion, -1 - internal update (rekey)
       shadow_stage => { data_type => 'TINYINT' },
 
       # always create this column, even if changesetting has not been requested
