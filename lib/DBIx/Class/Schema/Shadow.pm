@@ -77,14 +77,13 @@ sub changeset_do {
   local $self->{_shadow_changeset_rowobj};
 
   $self->txn_do (sub {
-    my $cset = $self->{_shadow_changeset_rowobj} = $cset_class->new_changeset($cset_rsrc, $args);
-
     local $self->{_shadow_changeset_timestamp} = $self->shadow_timestamp
       unless $self->{_shadow_changeset_timestamp};
 
-    $cset->set_timestamp ($self->{_shadow_changeset_timestamp});
-    $cset->nest_changeset($parent_cset)
-      if $parent_cset;
+    $args->{timestamp} ||= $self->{_shadow_changeset_timestamp};
+    $args->{parent_changeset} = $parent_cset if $parent_cset;
+
+    my $cset = $self->{_shadow_changeset_rowobj} = $cset_class->new_changeset($cset_rsrc, $args);
 
     $cset->insert;
 
@@ -121,11 +120,6 @@ sub shadow_changeset_resultclass {
 
     $self->throw_exception("Changeset resultclass $c must have an integer (INT) primary key column")
       unless $c->column_info('id')->{data_type} =~ /^ int(?:eger)? $/ix;
-
-    for (qw/set_timestamp nest_changeset/) {
-      $self->throw_exception("Changeset resultclass $c does not provide a '$_' method")
-        unless $c->can($_);
-    }
 
     $self->_shadow_changeset_resultclass_valid(1);
   }

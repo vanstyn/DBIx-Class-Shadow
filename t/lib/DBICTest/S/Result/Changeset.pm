@@ -23,16 +23,6 @@ __PACKAGE__->belongs_to(parent_changeset => __PACKAGE__, 'parent_changeset_id', 
   join_type => 'left'
 });
 
-sub set_timestamp {
-  my ($self, $timestamp) = @_;
-  $self->timestamp($timestamp);
-}
-
-sub nest_changeset {
-  my ($self, $parent) = @_;
-  $self->set_from_related('parent_changeset', $parent);
-}
-
 sub new_changeset {
    my ($class, $rsrc, $args) = @_;
 
