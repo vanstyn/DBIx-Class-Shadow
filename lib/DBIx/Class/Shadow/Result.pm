@@ -43,20 +43,20 @@ sub as_diff {
    } elsif ($stage eq 'insert') {
       $after  = { $self->_vanilla_columns };
    } else {
-      $before = { $self->previous->_vanilla_columns };
+      $before = { $self->previous_shadow->_vanilla_columns };
       $after  = { $self->_vanilla_columns };
    }
    return ($stage => $before, $after)
 }
 
-sub previous {
+sub previous_shadow {
    $_[0]->older_shadows->search(undef, {
       order_by => { -desc => 'shadow_id' },
       rows => 1,
    })->next
 }
 
-sub next {
+sub next_shadow {
    $_[0]->newer_shadows->search(undef, {
       order_by => { -asc => 'shadow_id' },
       rows => 1,

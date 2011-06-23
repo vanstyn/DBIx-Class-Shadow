@@ -149,38 +149,38 @@ my $hri = sub {
   })
 };
 
-subtest '$rs->version($x)' => sub {
-   my $version_X_rs = sub { $level->shadows->$hri->version($_[0]) };
+subtest '$rs->shadow_version($x)' => sub {
+   my $version_X_rs = sub { $level->shadows->$hri->shadow_version($_[0]) };
 
-   is_deeply([$version_X_rs->(1)->all], [$trace], 'version(1)');
-   is_deeply([$version_X_rs->(2)->all], [$debug], 'version(2)');
-   is_deeply([$version_X_rs->(3)->all], [$info],  'version(3)');
-   is_deeply([$version_X_rs->(4)->all], [$warn],  'version(4)');
-   is_deeply([$version_X_rs->(5)->all], [$error], 'version(5)');
-   is_deeply([$version_X_rs->(6)->all], [$fatal], 'version(6)');
+   is_deeply([$version_X_rs->(1)->all], [$trace], 'v1');
+   is_deeply([$version_X_rs->(2)->all], [$debug], 'v2');
+   is_deeply([$version_X_rs->(3)->all], [$info],  'v3');
+   is_deeply([$version_X_rs->(4)->all], [$warn],  'v4');
+   is_deeply([$version_X_rs->(5)->all], [$error], 'v5');
+   is_deeply([$version_X_rs->(6)->all], [$fatal], 'v6');
 };
 
-subtest '$rs->after(version => $x)' => sub {
-   my $after_X_rs = sub { $level->shadows->after(version => $_[0])->$hri };
+subtest '$rs->shadows_after(version => $x)' => sub {
+   my $after_X_rs = sub { $level->shadows->shadows_after(version => $_[0])->$hri };
    is_deeply(
       [$after_X_rs->(1)->all],
       [$debug, $info, $warn, $error, $fatal],
-      'after(1)'
+      'v1'
    );
    is_deeply(
       [$after_X_rs->(2)->all],
       [$info, $warn, $error, $fatal],
-      'after(2)'
+      'v2'
    );
-   is_deeply([$after_X_rs->(3)->all], [$warn, $error, $fatal], 'after(3)');
-   is_deeply([$after_X_rs->(4)->all], [$error, $fatal], 'after(4)');
-   is_deeply([$after_X_rs->(5)->all], [$fatal], 'after(5)');
-   is_deeply([$after_X_rs->(6)->all], [], 'after(6)');
+   is_deeply([$after_X_rs->(3)->all], [$warn, $error, $fatal], 'v3');
+   is_deeply([$after_X_rs->(4)->all], [$error, $fatal], 'v4');
+   is_deeply([$after_X_rs->(5)->all], [$fatal], 'v5');
+   is_deeply([$after_X_rs->(6)->all], [], 'v6');
 };
 
 {
-   subtest '$rs->after(datetime => $x)' => sub {
-      my $after_X_rs = sub { $level->shadows->after(datetime => $_[0])->$hri };
+   subtest '$rs->shadows_after(datetime => $x)' => sub {
+      my $after_X_rs = sub { $level->shadows->shadows_after(datetime => $_[0])->$hri };
       is_deeply(
          [$after_X_rs->($dt1)->all],
          [$debug, $info, $warn, $error, $fatal],
@@ -197,9 +197,8 @@ subtest '$rs->after(version => $x)' => sub {
       is_deeply([$after_X_rs->($dt6)->all], [], "$dt6");
    };
 
-   use Devel::Dwarn;
-   subtest '$rs->before(datetime => $x)' => sub {
-      my $before_X_rs = sub { $level->shadows->before(datetime => $_[0])->$hri };
+   subtest '$rs->shadows_before(datetime => $x)' => sub {
+      my $before_X_rs = sub { $level->shadows->shadows_before(datetime => $_[0])->$hri };
       is_deeply( [$before_X_rs->($dt1)->all], [], "$dt1");
       is_deeply( [$before_X_rs->($dt2)->all], [$trace], "$dt2");
       is_deeply([$before_X_rs->($dt3)->all], [$trace, $debug], "$dt3");
@@ -217,21 +216,21 @@ subtest '$rs->after(version => $x)' => sub {
    };
 }
 
-subtest '$rs->before(version => $x)' => sub {
-   my $before_X_rs = sub { $level->shadows->before(version => $_[0])->$hri };
-   is_deeply([$before_X_rs->(1)->all], [], 'before(1)');
-   is_deeply([$before_X_rs->(2)->all], [$trace], 'before(2)');
-   is_deeply([$before_X_rs->(3)->all], [$debug, $trace], 'before(3)');
-   is_deeply([$before_X_rs->(4)->all], [$info, $debug, $trace], 'before(4)');
+subtest '$rs->shadows_before(version => $x)' => sub {
+   my $before_X_rs = sub { $level->shadows->shadows_before(version => $_[0])->$hri };
+   is_deeply([$before_X_rs->(1)->all], [], 'v1');
+   is_deeply([$before_X_rs->(2)->all], [$trace], 'v2');
+   is_deeply([$before_X_rs->(3)->all], [$debug, $trace], 'v3');
+   is_deeply([$before_X_rs->(4)->all], [$info, $debug, $trace], 'v4');
    is_deeply(
       [$before_X_rs->(5)->all],
       [$warn, $info, $debug, $trace],
-      'before(5)'
+      'v5'
    );
    is_deeply(
       [$before_X_rs->(6)->all],
       [$error, $warn, $info, $debug, $trace],
-      'before(6)'
+      'v6'
    );
 };
 
@@ -242,9 +241,9 @@ subtest '$rs->groknik()' => sub {
    is($shadows->groknik('value', 'DEBUG', 'TRACE')->count, 0);
 };
 
-is_deeply([$level->shadows->inserts->$hri->all], [$trace], '$rs->inserts');
-is_deeply([$level->shadows->updates->$hri->all], [$debug, $info, $warn, $error, $fatal], '$rs->updates');
-is_deeply([$s->resultset('Config::Shadow')->deletes->$hri->all], [{
+is_deeply([$level->shadows->shadow_inserts->$hri->all], [$trace], '$rs->shadow_inserts');
+is_deeply([$level->shadows->shadow_updates->$hri->all], [$debug, $info, $warn, $error, $fatal], '$rs->shadow_updates');
+is_deeply([$s->resultset('Config::Shadow')->shadow_deletes->$hri->all], [{
   shadow_id => 10,
   shadow_stage => 0,
   shadow_timestamp => $dt6->$super_epoch,
@@ -254,14 +253,14 @@ is_deeply([$s->resultset('Config::Shadow')->deletes->$hri->all], [{
   shadowed_curpk_id => undef,
   shadowed_lifecycle => 4,
   shadow_changeset_id => undef,
-}], '$rs->deletes');
+}], '$rs->shadow_deletes');
 
-subtest 'next/previous' => sub {
-   my ( $r1 ) = $level->shadows->version(1)->all;
+subtest 'next_shadow/previous_shadow' => sub {
+   my ( $r1 ) = $level->shadows->shadow_version(1)->all;
    is( $r1->value, 'TRACE', 'revision 1 is what we expect');
-   my $r2 = $r1->next;
+   my $r2 = $r1->next_shadow;
    is( $r2->value, 'DEBUG', 'revision 2 is what we expect');
-   my $r1_b = $r2->previous;
+   my $r1_b = $r2->previous_shadow;
    is( $r1_b->value, 'TRACE', 'previous got us back to r1');
 };
 

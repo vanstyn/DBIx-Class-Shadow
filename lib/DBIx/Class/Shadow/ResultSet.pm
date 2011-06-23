@@ -12,7 +12,7 @@ sub last_shadow_rs {
   shift->search_rs({ 'newer_shadows.shadow_id' => undef }, { join => 'newer_shadows' });
 }
 
-sub version {
+sub shadow_version {
   $_[0]->search(undef, {
     order_by => 'shadow_id',
   })->slice($_[1] - 1)
@@ -24,7 +24,7 @@ my $super_epoch = sub {
    $_[0]->epoch . $ns
 };
 
-sub after_version {
+sub shadows_after_version {
   $_[0]->search(undef, {
     order_by => 'shadow_id',
     offset   => $_[1],
@@ -32,7 +32,7 @@ sub after_version {
 }
 
 # FIXME: how are we going to handle people using a different type here?
-sub after_datetime {
+sub shadows_after_datetime {
   my ($self, $dt) = @_;
 
   $self->throw_exception('after datetime requires a datetime object!')
@@ -45,11 +45,11 @@ sub after_datetime {
   })
 }
 
-sub before_version {
+sub shadows_before_version {
   my $self = shift;
 
   my $version_query =
-    $self->version($_[0])->get_column('shadow_id')->as_query;
+    $self->shadow_version($_[0])->get_column('shadow_id')->as_query;
 
   $self->search({
      shadow_id => { '<' => $version_query },
@@ -58,7 +58,7 @@ sub before_version {
    })
 }
 
-sub before_datetime {
+sub shadows_before_datetime {
   my ($self, $dt) = @_;
 
   $self->throw_exception('before datetime requires a datetime object!')
@@ -77,7 +77,7 @@ sub before_datetime {
       datetime => 1,
    );
    no strict 'refs';
-   for my $meth (qw(before after)) {
+   for my $meth (qw(shadows_before shadows_after)) {
       *{$meth} = subname $meth => sub {
          my ($self, $kind, $val) = @_;
 
@@ -135,9 +135,9 @@ my $stage = sub {
    $self->search({ "$me.shadow_stage" => $stage });
 };
 
-sub inserts { shift->$stage(2) }
-sub updates { shift->$stage(1) }
-sub deletes { shift->$stage(0) }
+sub shadow_inserts { shift->$stage(2) }
+sub shadow_updates { shift->$stage(1) }
+sub shadow_deletes { shift->$stage(0) }
 
 1;
 
@@ -157,45 +157,45 @@ form of shadow resultset.
 
 Returns a resultset containing the newest shadow
 
-=head2 version
+=head2 shadow_version
 
- $rs->version(4);
+ $rs->shadow_version(4);
 
 Returns a resultset containing the fourth shadow, where the first is the oldest
 
-=head2 after
+=head2 shadows_after
 
- $rs->after(
+ $rs->shadows_after(
    version => 4,
  );
 
- $rs->after(
+ $rs->shadows_after(
    datetime => $datetime_object,
  );
 
- $rs->after(
+ $rs->shadows_after(
    changeset => $changeset_id,
  );
 
- $rs->after(
+ $rs->shadows_after(
    changeset_datetime => $datetime,
  );
 
-=head2 before
+=head2 shadows_before
 
- $rs->before(
+ $rs->shadows_before(
    version => 4,
  );
 
- $rs->before(
+ $rs->shadows_before(
    datetime => $datetime_object,
  );
 
- $rs->before(
+ $rs->shadows_before(
    changeset => $changeset_id,
  );
 
- $rs->before(
+ $rs->shadows_before(
    changeset_datetime => $datetime,
  );
 
@@ -207,15 +207,15 @@ Returns a resultset containing the fourth shadow, where the first is the oldest
 
 Returns the specific shadow when C<$column> changed from C<$from> to C<$to>.
 
-=head2 inserts
+=head2 shadow_inserts
 
 Returns a resultset with just inserts
 
-=head2 updates
+=head2 shadow_updates
 
 Returns a resultset with just updates
 
-=head2 deletes
+=head2 shadow_deletes
 
 Returns a resultset with just deletes
 =cut
