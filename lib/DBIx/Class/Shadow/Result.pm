@@ -27,15 +27,12 @@ sub _vanilla_columns {
    } grep /^shadow_val_/, keys %columns
 }
 
-# I think this should be in a separate component, but I don't know the
-# namespace, so I'm leaving it here for now
-
-my @stages = (qw( delete update insert ));
+my @stages = (qw( rekey delete update insert  ));
 
 sub as_diff {
    my $self = shift;
 
-   my $stage  = $stages[$self->shadow_stage];
+   my $stage  = $stages[$self->shadow_stage + 1];
    my $before = undef;
    my $after  = undef;
    if ($stage eq 'delete') {
@@ -89,8 +86,6 @@ methods defined are thus available when you access any form of shadow object.
 Returns the given C<shadow> but with it's values inflated into the row that the
 shadow is based on, so that all the actual row methods are available, including
 relationships at shadowtime.
-
-# FIXME: I think the next three methods should be in a couple components
 
 =head2 as_diff
 
