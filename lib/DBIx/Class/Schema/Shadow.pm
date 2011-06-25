@@ -108,6 +108,9 @@ sub shadow_changeset_resultclass {
     $self->throw_exception("Changeset class $c does not look like a Result class")
       unless $c->isa('DBIx::Class::Row');
 
+    $self->throw_exception("Changeset class $c does not implement a new_changeset method")
+      unless $c->can('new_changeset');
+
     my @pk = $c->primary_columns;
     $self->throw_exception("Changeset resultclass $c does not have a primary key column 'id'")
       unless (
@@ -478,7 +481,9 @@ C<shadow_changeset_resultclass> is the class that stores information related to
 changesets.  By default this is merely a timestamp, but other obvious things to
 store would be a user_id and a session_id.  Note that the class must be a
 C<DBIx::Class::Row>, must have an C<id> column of type C<int>, and must provide
-C<set_timestamp> and C<nest_changeset> methods.
+a C<new_changeset> method, which will be passed a hashref containing
+an integer for C<timestamp>, an object for C<parent_changeset>, and any other
+parameters that were passed to L</changeset_do>.
 
 =head2 shadow_timestamp
 
