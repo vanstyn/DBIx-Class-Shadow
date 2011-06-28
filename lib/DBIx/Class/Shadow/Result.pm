@@ -5,18 +5,34 @@ use strict;
 
 use base qw/DBIx::Class::Relationship::Cascade::Rekey DBIx::Class::Core/;
 
-sub _non_shadowed_result_class {
-   # herp derp what a dump impl
-   $_[0]->result_source->relationship_info('current_version')->{class};
-}
-
 sub as_result {
    my $self = shift;
-   my $class = $self->_non_shadowed_result_class;
+   my $rsrc = $self->result_source;
+   my $moniker = $rsrc->source_name;
+   my $schema = $rsrc->schema;
 
-   return $class->new({ $self->_vanilla_columns })
+   my $ph = $schema->source(
+      $schema->_shadow_moniker_mappings->{phantoms}{$moniker}
+         ||
+      $self->throw_exception("$moniker does not seem to know its phantom source moniker...")
+   )->resultset->new ({
+      $self->_vanilla_columns,
+      -result_source => $schema->source(
+         $schema->_shadow_moniker_mappings->{originals}{$moniker}
+            ||
+         $self->throw_exception("$moniker does not seem to know its original source moniker...")
+      ),
+   });
+
+   $ph->{-from_shadow} = {
+      id => $self->shadow_id,
+      timestamp => $self->shadow_timestamp,
+   };
+
+   $ph;
 }
 
+# FIXME - bad name
 sub _vanilla_columns {
    my %columns = $_[0]->get_columns;
 

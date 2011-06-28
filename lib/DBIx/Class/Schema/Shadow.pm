@@ -10,6 +10,8 @@ use Try::Tiny;
 use List::Util qw/first/;
 use List::UtilsBy qw/sort_by/;
 use Time::HiRes qw/gettimeofday/;
+use Storable qw/dclone/;
+use Sub::Name qw/subname/;
 
 use namespace::clean;
 
@@ -21,7 +23,16 @@ __PACKAGE__->mk_group_accessors (inherited => qw/
   shadow_timestamp_datatype
   _shadow_changeset_resultclass
   _shadow_changeset_resultclass_valid
+  _shadow_moniker_mappings
 /);
+__PACKAGE__->_shadow_moniker_mappings({});
+
+sub clone {
+  my $old_mappings = $_[0]->_shadow_moniker_mappings;
+  my $self = shift->next::method(@_);
+  $self->{_shadow_moniker_mappings} = dclone $old_mappings;
+  $self;
+}
 
 # a user may want to change this if shadow_timestamp() is overriden
 __PACKAGE__->shadow_timestamp_datatype('bigint');
@@ -30,6 +41,7 @@ __PACKAGE__->shadow_result_base_class('DBIx::Class::Shadow::Result');
 __PACKAGE__->shadow_resultset_base_class('DBIx::Class::Shadow::ResultSet');
 
 my $shadow_suffix = '::Shadow';
+my $phantom_suffix = '::Phantom';
 my $row_shadows_relname = 'shadows';
 my $shadow_result_component = 'DBIx::Class::Shadow';
 
@@ -135,7 +147,7 @@ sub register_class {
 
   if ($res_class->isa ($shadow_result_component) ) {
 
-    my $shadow_class = $self->_gen_shadow_source($res_class);
+    my ($shadow_class, $phantom_class) = $self->_gen_shadow_sources($res_class);
 
     my $shadow_rels;
     my $requested_relationships = $res_class->shadow_relationships;
@@ -157,7 +169,7 @@ sub register_class {
     }
 
     # see if we need to link a changeset
-    # we do it here, because we do not have access to $moniker anywhere else
+    # we do it here, because we do not have access to $moniker earlier
     if (my $cset_class = $self->shadow_changeset_resultclass) {
       $shadow_class->belongs_to(changeset => $cset_class, 'shadow_changeset_id', {
         join_type => 'left', on_delete => 'restrict', on_update => 'cascade'
@@ -170,10 +182,29 @@ sub register_class {
       $self->_reapply_source_prototype($cset_class);
     }
 
-    $self->register_class($moniker . $shadow_suffix, $shadow_class);
-  }
+    # register the original source itself to resolve the resultset class
+    $self->next::method ($moniker, $res_class);
 
-  $self->next::method ($moniker, $res_class);
+    my $rs_class = $self->source($moniker)->resultset_class;
+    my $phantom_rs_class = $rs_class . $phantom_suffix;
+    require DBIx::Class::Shadow::Phantom::ResultSet;
+    $self->inject_base($phantom_rs_class, 'DBIx::Class::Shadow::Phantom::ResultSet', $rs_class);
+
+    $phantom_class->resultset_class($phantom_rs_class);
+
+    # register extras and record moniker maps
+    my $sh_moniker = $moniker . $shadow_suffix;
+    $self->register_source($sh_moniker, $shadow_class->result_source_instance);
+    my $ph_moniker = $moniker . $phantom_suffix;
+    $self->register_source($ph_moniker, $phantom_class->result_source_instance);
+
+    @{$self->_shadow_moniker_mappings->{shadows}||={}}{$moniker, $ph_moniker} = ($sh_moniker) x 2;
+    @{$self->_shadow_moniker_mappings->{phantoms}||={}}{$moniker, $sh_moniker} = ($ph_moniker) x 2;
+    @{$self->_shadow_moniker_mappings->{originals}||={}}{$ph_moniker, $sh_moniker} = ($moniker) x 2;
+  }
+  else {
+    $self->next::method ($moniker, $res_class);
+  }
 }
 
 sub _hash_for_rel { +{ map
@@ -192,10 +223,11 @@ sub _sort_colhash {
   @cols;
 }
 
-sub _gen_shadow_source {
+sub _gen_shadow_sources {
   my ($self, $res_class) = @_;
 
   my $shadow_class = $res_class . $shadow_suffix;
+  my $phantom_class = $res_class . $phantom_suffix;
 
   # we may request the same shadow-generation repeatedly
   unless ($shadow_class->isa($self->shadow_result_base_class)) {
@@ -207,6 +239,7 @@ sub _gen_shadow_source {
     $self->throw_exception("Unable to shadow $res_class - non-scalar table names are not supported")
       if ref $res_table;
 
+    # gen the shadow source/class
     $self->inject_base($shadow_class, $self->shadow_result_base_class);
     $shadow_class->table('shadow_' . $res_table);
     $shadow_class->resultset_class($self->shadow_resultset_base_class);
@@ -251,6 +284,25 @@ sub _gen_shadow_source {
 
     $shadow_class->set_primary_key('shadow_id');
 
+    # gen the phantom source/class
+    require DBIx::Class::Shadow::Phantom::Result;
+    $self->inject_base($phantom_class, 'DBIx::Class::Shadow::Phantom::Result', $res_class);
+
+    # get a source clone - *DELIBERATELY* share everything except for
+    # the relationship definitions
+    # down the road (when the main source is registsred and the resultset
+    # class is fully resolved) - we will swap the default resultset class too
+    my $orig_rsrc = $res_class->result_source_instance;
+    my $ph_rsrc = bless {
+      %$orig_rsrc,
+      _relationships => {},
+      result_class => $phantom_class,
+      resultset_class => '_UNSET_'
+    }, ref $orig_rsrc;
+    delete $ph_rsrc->{schema}; # otherwise we leak it via classdata
+    $phantom_class->table($ph_rsrc);
+
+    # deal with row-to-shadow relationships (inter-shadow/phantom rels come in later)
     # linkage to shadowed source
     my $current_belongs_to = { map {( $_ => "shadowed_curpk_$_" )} @pks };
 
@@ -286,9 +338,23 @@ sub _gen_shadow_source {
       { cascade_delete => 0 }, # FIXME - need to think what to do about cascade_copy - not clear-cut
     );
 
+    # register default stubs for the phantom so that relationship
+    # generated acessors are *NOT* navigable by default
+    # we will overwrite these throw-stubs with the real deal for
+    # shadowed relationships
+    for my $relname (keys %{$orig_rsrc->{_relationships}}) {
+      no strict 'refs';
+      no warnings 'redefine';
+      if ($orig_rsrc->{_relationships}{$relname}{attrs}{accessor}) {
+        my $acc = "${phantom_class}::${relname}";
+        *$acc = subname $acc => sub {
+          shift->throw_exception("Unable to navigate non-shadowed relationship '$relname' from phantom object");
+        };
+      }
+    }
   }
 
-  return $shadow_class
+  return ($shadow_class, $phantom_class);
 }
 
 sub _gen_shadow_relationship {
@@ -340,7 +406,7 @@ sub _gen_shadow_relationship {
   } keys %$cond };
 
   my ($our_shadow, $foreign_shadow) = map
-    { $self->_gen_shadow_source($_) }
+    { ($self->_gen_shadow_sources($_))[0] }
     ($res_class, $foreign_class)
   ;
 
@@ -399,6 +465,13 @@ sub _gen_shadow_relationship {
 
     $shadow_rel_cond = { "foreign.${our_id_fk_col}" => 'self.shadowed_lifecycle' };
   }
+
+####
+# This is where I need to add relationships to the phantom class, except they
+# can not be has_many's - they need to be regular encapsulates of "last shadow"
+# this *is* currently possible, it just gets very very hairy, hence thinking how
+# to do it right...
+###
 
   # do not deploy any FK constraints
   my $sh_relname = "${rel}_shadows";

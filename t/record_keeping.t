@@ -7,7 +7,9 @@ use lib 't/lib';
 use DBICTest::S;
 
 my $s = DBICTest::S->connect('dbi:SQLite::memory:');
-is_deeply (
+use Test::Differences;
+eq_or_diff(
+#is_deeply (
   ({ map
     {
       my $src = $s->source($_);
@@ -18,7 +20,7 @@ is_deeply (
         }
         $src->relationships
       };
-    } $s->sources
+    } grep { $_ !~ /::Phantom$/ } $s->sources
   }),
   {
     'Config' => {
@@ -204,7 +206,7 @@ my $s_state = { map {
     {[ map { defined $_ ? $_ . '' : '_UNDEF_' } @$_ ]}
     $s->resultset($_)->search({}, { columns => \@cols, order_by => [$s->source($_)->primary_columns] })->cursor->all
   ]
-} $s->sources };
+} grep { $_ !~ /::Phantom$/ } $s->sources };
 
 # briefly on how this works:
 # * every time a shadowed row is created, a new "shadowed_lifecycle" is established, and the tracked
