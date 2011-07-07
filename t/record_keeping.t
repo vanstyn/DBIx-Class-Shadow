@@ -2,14 +2,16 @@ use warnings;
 use strict;
 
 use Test::More;
+#use Test::Differences;
 
 use lib 't/lib';
 use DBICTest::S;
 
 my $s = DBICTest::S->connect('dbi:SQLite::memory:');
-use Test::Differences;
-eq_or_diff(
-#is_deeply (
+#my $s = DBICTest::S->connect(map { $ENV{"DBICTEST_MYSQL_$_"} } qw/DSN USER PASS/ );
+
+#eq_or_diff(
+is_deeply (
   ({ map
     {
       my $src = $s->source($_);
@@ -91,7 +93,7 @@ eq_or_diff(
   'All relationships correctly set',
 );
 
-$s->deploy();
+$s->deploy({add_drop_table => 1});
 
 # make everything happen in "steps", ++ing after each op
 $s->{_shadow_changeset_timestamp} = '666';
@@ -215,7 +217,6 @@ my $s_state = { map {
 # * once a row is deleted, all its existing shadows have their pk-pointing-fks set to NULL
 # * lifecycle is an integer that increments once per INSERT and stays the sime for the
 # lifetime of the shadowed row. This is what we use to build relationships between shadows
-#use Test::Differences;
 #eq_or_diff(
 is_deeply(
   $s_state,
