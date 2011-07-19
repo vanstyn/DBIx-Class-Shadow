@@ -47,7 +47,7 @@ sub _instantiate_shadow_row {
     shadow_timestamp => $rsrc->schema->{_shadow_changeset_timestamp},
     shadow_stage => $stage,
     shadowed_lifecycle => $lifecycle || \ sprintf(
-      '( SELECT COALESCE( MAX( shadowed_lifecycle ), 0 ) + 1 FROM %s _subq_)',
+      '( SELECT COALESCE( MAX( shadowed_lifecycle ), 0 ) + 1 FROM %s sub__query )',
       $schema->storage->sql_maker->_quote($shadow_rsrc->name),
     ),
     ( map {
