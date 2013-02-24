@@ -11,7 +11,7 @@ unlink $db_file if (-f $db_file);
 
 run_tests(
 	"Tracking on the 'Sakila' example db (MySQL)", 
-	'Routine::Sakila' => {
+	'Routine::Sakila::VerifyShadows' => {
 		test_schema_dsn => 'dbi:SQLite:dbname=' . $db_file,
 	}
 );

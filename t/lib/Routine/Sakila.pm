@@ -61,6 +61,31 @@ test 'inserts' => { desc => 'Insert Test Data' } => sub {
 };
 
 
+
+test 'simple_updates' => { desc => 'Trivial updates' } => sub {
+	my $self = shift;
+	my $schema = $self->Schema;
+	
+	ok(
+		my $Film = $schema->resultset('Film')->search_rs({ 
+			title => 'ACADEMY DINOSAUR'
+		})->first,
+		"Find 'ACADEMY DINOSAUR' Film row"
+	);
+	
+	ok(
+		$Film->update({
+			title => 'Academy Dinosaur',
+			release_year => '1812',
+			length => 42
+		}),
+		"Make a few trivial updates to 'ACADEMY DINOSAUR' Film row"
+	);
+
+};
+
+
+
 test 'updates_cascades' => { desc => 'Updates causing db-side cascades' } => sub {
 	my $self = shift;
 	my $schema = $self->Schema;
