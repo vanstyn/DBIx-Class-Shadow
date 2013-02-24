@@ -8,6 +8,7 @@ with 'Routine::Base';
 
 use Test::More; 
 use namespace::autoclean;
+use Try::Tiny;
 
 has 'test_schema_class', is => 'ro', default => 'TestSchema::Sakila';
 
@@ -43,19 +44,45 @@ test 'inserts' => { desc => 'Insert Test Data' } => sub {
 		"Populate some Film rows"
 	);
 	
+	# --------
+	# This barfs because 'last_update' is not supplied, but defaults to
+	# the current datetime. But Shadow doesn't see this, and tries to 
+	# insert shadow_val_last_update last_update as NULL, which throws an 
+	# exception because it isn't a nullable column (which shadow duplicated
+	# from 'last_update')
+	ok( 
+		(try{
+			$schema->resultset('Actor')->create({
+				first_name => 'JOE', 
+				last_name => 'BLOW',
+			})
+		} catch { 
+			my $err = shift;
+			diag("$err");
+		}),
+		"Insert an Actor row (rely on db-default for 'last_update' col)"
+	);
 	
-	## Busted because of missing COALESCE in Shadow?
-	#ok( 
-	#	$schema->resultset('Actor')->create({
-	#		#actor_id => 1,
-	#		first_name => 'PENELOPE', 
-	#		last_name => 'GUINESS',
-	#		film_actors => [
-	#			{ film_id => 1 }
-	#		]
-	#	}),
-	#	"Insert an Actor row with film_actors link"
-	#);
+	# The explicit 'last_update' cols below should not be needed, but are due
+	# to apparent bug in Shadow (above). Using the value '2010-09-08 07:06:05'
+	# in order to look conspicuous
+	ok( 
+		$schema->resultset('Actor')->create({
+			#actor_id => 1,
+			last_update => '2010-09-08 07:06:05', #<-- shouldn't be needed!
+			first_name => 'PENELOPE', 
+			last_name => 'GUINESS',
+			film_actors => [
+				{ 
+					film_id => 1, 
+					last_update => '2010-09-08 07:06:05' #<-- shouldn't be needed!
+				}
+			]
+		}),
+		"Insert an Actor row with film_actors link"
+	);
+	#
+	# --------
 
 	
 };

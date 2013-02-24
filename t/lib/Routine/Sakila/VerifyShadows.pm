@@ -26,8 +26,8 @@ sub ok_matches_latest_shadow {
 		" Get Shadow /for:[$test_name]"
 	);
 	is_deeply(
-		{ $Row->get_columns },
 		{ $ShadowRow->as_result->get_columns },
+		{ $Row->get_columns },
 		$test_name
 	);
 }
@@ -79,11 +79,22 @@ test 'shadow_rows' => { desc => 'Verify Shadow Rows' } => sub {
 	);
 	#
 	# ---------
-	
+
 };
 
 
+test 'iterate_latests' => { desc => 'Bulk iterate and compare rows to their latest shadow' } => sub {
+	my $self = shift;
+	my $schema = $self->Schema;
 
+	# -- Bulk iterate and compare all our rows to their latest shadow 
+	# (does overlap with some more targeted tests above)
+	my @results = qw(Actor Film Language FilmActor);
+	foreach my $result (@results) {
+		ok_matches_latest_shadow($_) for ($schema->resultset($result)->all);
+	}
+	# --
 
+};
 
 1;
