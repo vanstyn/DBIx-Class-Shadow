@@ -42,6 +42,10 @@ sub _instantiate_shadow_row {
   local $schema->{_shadow_changeset_timestamp} = $schema->shadow_timestamp
     unless $schema->{_shadow_changeset_timestamp};
 
+	# -- demo db-side defaults fix
+	my $new_columns = { $self->get_from_storage->get_columns };
+	# --
+
   my $self_rs;
   my $new_shadow = $self->new_related($shadows_rel, {
     shadow_timestamp => $rsrc->schema->{_shadow_changeset_timestamp},
@@ -50,19 +54,13 @@ sub _instantiate_shadow_row {
       '( SELECT COALESCE( MAX( shadowed_lifecycle ), 0 ) + 1 FROM %s sub__query )',
       $schema->storage->sql_maker->_quote($shadow_rsrc->name),
     ),
-    ( map {
-      my $val = $self->get_column($_);
-      ("shadow_val_$_" =>
-        # in case the value was *not* retrieved on insert - we need to do it
-        # ourselves
-        (ref $val eq 'SCALAR' or (ref $val eq 'REF' and ref $$val eq 'ARRAY'))
-          ? do {
-            ($self_rs ||= $rsrc->resultset->search_rs($self->ident_condition))
-              ->get_column($_)
-               ->as_query
-          } : $val
-      );
-    } @{$self->shadow_columns} ),
+	
+	# -- demo db-side defaults fix
+	( map {
+		( "shadow_val_$_" => $new_columns->{$_} )
+	} @{$self->shadow_columns} ),
+	# --
+	 
   });
 
   $new_shadow->set_from_related( changeset => $schema->{_shadow_changeset_rowobj} )
