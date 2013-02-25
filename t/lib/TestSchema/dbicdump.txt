@@ -1,0 +1,22 @@
+# example dbicdump commands used to generate test schemas...
+# for reference purposes only
+
+
+dbicdump \
+  -o dump_directory=./t/lib  \
+  -o debug=1 -o rescan=1 -o generate_pod=0 \
+  -o schema_components='["Schema::Shadow"]' \
+  -o components='["Shadow","InflateColumn::DateTime"]' \
+  TestSchema::Sakila \
+  'dbi:mysql:sakila' root ''
+
+  
+
+  
+dbicdump \
+  -o dump_directory=./t/lib  \
+  -o debug=1 -o rescan=1 -o generate_pod=0 \
+  -o schema_components='["Schema::Shadow"]' \
+  -o components='["Shadow"]' \
+  TestSchema::Sakila \
+  'dbi:mysql:sakila' root ''

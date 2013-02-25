@@ -11,6 +11,7 @@ sub populate {
     return shift->populate(@_)
   }
   else {
+    # Force out of void context to avoid Storage::insert_bulk
     my $res = shift->populate(@_);
     return;
   }
