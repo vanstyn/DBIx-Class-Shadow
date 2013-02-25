@@ -93,7 +93,7 @@ is_deeply (
   'All relationships correctly set',
 );
 
-$s->deploy({add_drop_table => 1});
+$s->deploy({add_drop_table => 0});
 
 # make everything happen in "steps", ++ing after each op
 $s->{_shadow_changeset_timestamp} = '666';
