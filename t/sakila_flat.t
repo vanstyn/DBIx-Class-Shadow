@@ -5,6 +5,7 @@ use warnings;
 use Test::More;
 #use Test::Routine::Util;
 use lib qw(t/lib);
+use TestUtil;
 
 my $dsn = 'dbi:SQLite::memory:';
 my $schema_class = 'TestSchema::Sakila'; #<-- from Routine::Sakila
@@ -157,28 +158,7 @@ ok(
 ### from Routine::Sakila::VerifyShadows ###
 ###
 
-# convenience func - gets the latest shadow row from an Rs of shadows:
-sub latest_shadow($) {
-  my $ShadowRs = shift;
-  return $ShadowRs->search_rs(undef,
-    { order_by => { -desc => 'shadow_id' } }
-  )->first;
-}
 
-
-sub ok_matches_latest_shadow {
-  my $Row = shift;
-  my $test_name = shift || "Current Row ($Row) matches its most recent Shadow";
-  ok(
-    my $ShadowRow = latest_shadow $Row->shadows,
-    " Get Shadow /for:[$test_name]"
-  );
-  is_deeply(
-    { $ShadowRow->as_result->get_columns },
-    { $Row->get_columns },
-    $test_name
-  );
-}
 
 ok(
   my $Language = $schema->resultset('Language')->find({ name => 'English' }),

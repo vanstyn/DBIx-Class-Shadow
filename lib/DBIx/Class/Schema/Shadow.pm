@@ -522,7 +522,7 @@ sub shadow_sources {
 }
 
 # like ->sources() but limited to originals (i.e. not shadows/phantoms):
-sub original_sources {
+sub shadowed_sources {
   my $self = shift;
   my %s = map {$_=>1} values %{$self->_shadow_moniker_mappings->{originals}};
   return keys %s;
@@ -536,6 +536,44 @@ sub deploy_shadows {
   return $self->deploy($sqltargs, @args);
 }
 
+# Initialize shadows for *all* rows in shadowed sources. This is
+# only intended for turning on shadowing for a database with existing
+# data. WARNING: this could be **very** heavy, depending on number
+# of rows
+sub init_all_row_shadows {
+  my $self = shift;
+
+  my $guard = $self->txn_scope_guard
+    unless $self->{_shadow_changeset_rows};
+
+  local $self->{_shadow_changeset_rows} = []
+    if $guard;
+
+  for my $rsrc (map {$self->source($_)} $self->shadowed_sources) {
+    for my $Row ($rsrc->resultset->all) {
+      next if ($Row->shadows->count > 0);
+
+      # TODO: use a custom stage instead of '2' (insert) to distinguish?
+      push @{$self->{_shadow_changeset_rows}}, $Row->_instantiate_shadow_row(2);
+    }
+  }
+
+  if ($guard) {
+    # FIXME: are there any stack/order considerations to worry about here? 
+    #  don't think so since we're looking at *existing* rows...
+    $_->insert for @{$self->{_shadow_changeset_rows}};
+    $guard->commit;
+  }
+
+  1;
+}
+
+# Deploy shadow sources and initialize shadows for existing rows at once
+sub deploy_init_shadows {
+  my $self = shift;
+  $self->deploy_shadows(@_);
+  $self->init_all_row_shadows;
+}
 
 1;
 
