@@ -195,13 +195,21 @@ sub update {
   };
 
   if ($has_trackable_changes) {
+    my $lifecycle_as_query = $rsrc->resultset
+      ->search($self->ident_condition)
+       ->search_related($shadows_rel, {}, { rows => 1 })
+        ->get_column('shadowed_lifecycle')
+         ->as_query;
+
     my $sh = $self->_instantiate_shadow_row(
       ($relink_update ? -1 : 1),   # regular or internal update
-      $rsrc->resultset
-            ->search($self->ident_condition)
-             ->search_related($shadows_rel, {}, { rows => 1 })
-              ->get_column('shadowed_lifecycle')
-               ->as_query
+
+      # Wrap with COALESCE to default the lifecycle to '1' in case the 
+      # subquery doesn't return any rows. This will happen in only the case
+      # of existing data that hasn't had shadows initialized yet
+      #  (i.e. $schema->init_all_row_shadows wasn't called)
+      # Also incrementing the lifecycle
+      \ sprintf('(SELECT COALESCE( %s, 0 ) + 1)',$$lifecycle_as_query->[0])
     );
 
     $sh->{_possibly_duplicate_shadow} = 1

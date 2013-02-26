@@ -154,12 +154,12 @@ is_deeply(
 
 ok( 
   (try{
-    $schema->deploy_shadows(); 1
+    $schema->deploy_init_shadows(); 1
   } catch { 
     my $err = shift;
     diag("$err");
   }),
-  "Deploy Shadow Sources"
+  "Deploy Shadow Sources and Initialize Shadows for all existing rows"
 );
 
 
@@ -176,10 +176,12 @@ ok(
   "Change the name of 'English' Language row to uppercase"
 );
 
-ok_matches_latest_shadow(
-  $English,
-  "Current 'English' Language Row matches its latest Shadow"
-);
+
+# -- Bulk iterate and compare all our rows to their latest shadow 
+foreach my $source ($schema->shadowed_sources) {
+  ok_matches_latest_shadow($_) for ($schema->resultset($source)->all);
+}
+# --
 
 
 $schema->storage->dbh->disconnect;

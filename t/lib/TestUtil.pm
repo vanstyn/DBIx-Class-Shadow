@@ -35,7 +35,7 @@ sub ok_matches_latest_shadow {
     { $ShadowRow->as_result->get_columns },
     { $Row->get_columns },
     $test_name
-  );
+  ) if ($ShadowRow);
 }
 
 1;
