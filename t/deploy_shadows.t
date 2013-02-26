@@ -21,7 +21,6 @@ my $dsn = 'dbi:SQLite:dbname=' . $db_file;
 die "DB file '$db_file' already exists; please remove this file and try again\n"
   if(-e $db_file);
 
-
 # Connect with normal, non-shadowing schema:
 my $schema_class = 'TestSchema::SakilaPlain';
 
@@ -57,7 +56,6 @@ is_deeply(
   "Expected original sources reported by schema"
 );
 
-
 ok( 
   (try{
     $schema->deploy(); 1
@@ -67,7 +65,6 @@ ok(
   }),
   "Deploy Plain/Original Sources only"
 );
-
 
 $schema->txn_do(sub {
   ok(
@@ -85,15 +82,8 @@ $schema->txn_do(sub {
   );
 });
 
-##
-## TODO: Add some 'existing' data here
-##
-
 
 $schema->storage->dbh->disconnect;
-
-
-
 
 ###
 ###
@@ -103,8 +93,6 @@ $schema->storage->dbh->disconnect;
 $schema_class = 'TestSchema::Sakila';
 Module::Runtime::require_module($schema_class);
 $schema = $schema_class->connect(@connect);
-
-
 
 
 is_deeply(
@@ -196,6 +184,6 @@ foreach my $source ($schema->shadowed_sources) {
 
 
 $schema->storage->dbh->disconnect;
-#unlink $db_file;
+unlink $db_file;
 
 done_testing;
