@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::FilmCategory;
+package TestSchema::SakilaPlain::Result::City;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,19 +8,20 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
-__PACKAGE__->table("film_category");
+__PACKAGE__->table("city");
 __PACKAGE__->add_columns(
-  "film_id",
+  "city_id",
   {
     data_type => "smallint",
     extra => { unsigned => 1 },
-    is_foreign_key => 1,
+    is_auto_increment => 1,
     is_nullable => 0,
   },
-  "category_id",
+  "city",
+  { data_type => "varchar", is_nullable => 0, size => 50 },
+  "country_id",
   {
-    data_type => "tinyint",
+    data_type => "smallint",
     extra => { unsigned => 1 },
     is_foreign_key => 1,
     is_nullable => 0,
@@ -33,23 +34,23 @@ __PACKAGE__->add_columns(
     is_nullable => 0,
   },
 );
-__PACKAGE__->set_primary_key("film_id", "category_id");
-__PACKAGE__->belongs_to(
-  "category",
-  "TestSchema::Sakila::Result::Category",
-  { category_id => "category_id" },
-  { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
+__PACKAGE__->set_primary_key("city_id");
+__PACKAGE__->has_many(
+  "addresses",
+  "TestSchema::SakilaPlain::Result::Address",
+  { "foreign.city_id" => "self.city_id" },
+  { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->belongs_to(
-  "film",
-  "TestSchema::Sakila::Result::Film",
-  { film_id => "film_id" },
+  "country",
+  "TestSchema::SakilaPlain::Result::Country",
+  { country_id => "country_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:nsRd0ZMtg3w+cngC+8rdtQ
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:b7XuuWxItb1mLESEH+XPHQ
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

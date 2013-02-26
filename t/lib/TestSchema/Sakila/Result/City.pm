@@ -7,7 +7,7 @@ package TestSchema::Sakila::Result::City;
 use strict;
 use warnings;
 
-use base 'DBIx::Class::Core';
+use base 'TestSchema::Sakila::BaseResult';
 __PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("city");
 __PACKAGE__->add_columns(
@@ -50,8 +50,8 @@ __PACKAGE__->belongs_to(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-25 15:05:21
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:iEHqBSUbx5I6G/UwbnkV4w
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:pDq53XdEMbqGfbsYWkdW2w
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

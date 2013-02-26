@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Language;
+package TestSchema::SakilaPlain::Result::Language;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("language");
 __PACKAGE__->add_columns(
   "language_id",
@@ -31,20 +30,20 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("language_id");
 __PACKAGE__->has_many(
   "film_languages",
-  "TestSchema::Sakila::Result::Film",
+  "TestSchema::SakilaPlain::Result::Film",
   { "foreign.language_id" => "self.language_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->has_many(
   "film_original_languages",
-  "TestSchema::Sakila::Result::Film",
+  "TestSchema::SakilaPlain::Result::Film",
   { "foreign.original_language_id" => "self.language_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:6xVczrVBLYIVaow2/n9wLw
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:/4XZEQA/jup+/3ilIdPWEg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

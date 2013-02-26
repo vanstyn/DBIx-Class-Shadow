@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Rental;
+package TestSchema::SakilaPlain::Result::Rental;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("rental");
 __PACKAGE__->add_columns(
   "rental_id",
@@ -58,32 +57,32 @@ __PACKAGE__->set_primary_key("rental_id");
 __PACKAGE__->add_unique_constraint("rental_date", ["rental_date", "inventory_id", "customer_id"]);
 __PACKAGE__->belongs_to(
   "customer",
-  "TestSchema::Sakila::Result::Customer",
+  "TestSchema::SakilaPlain::Result::Customer",
   { customer_id => "customer_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 __PACKAGE__->belongs_to(
   "inventory",
-  "TestSchema::Sakila::Result::Inventory",
+  "TestSchema::SakilaPlain::Result::Inventory",
   { inventory_id => "inventory_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 __PACKAGE__->has_many(
   "payments",
-  "TestSchema::Sakila::Result::Payment",
+  "TestSchema::SakilaPlain::Result::Payment",
   { "foreign.rental_id" => "self.rental_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->belongs_to(
   "staff",
-  "TestSchema::Sakila::Result::Staff",
+  "TestSchema::SakilaPlain::Result::Staff",
   { staff_id => "staff_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:Sz2jqkL/J6PqRk+EBg94/w
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:Pro+rRrznRUUVotFto4XEg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

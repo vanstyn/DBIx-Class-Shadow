@@ -514,6 +514,29 @@ sub _reapply_source_prototype {
   }
 }
 
+# like ->sources() but limited to shadows:
+sub shadow_sources {
+  my $self = shift;
+  my %s = map {$_=>1} values %{$self->_shadow_moniker_mappings->{shadows}};
+  return keys %s;
+}
+
+# like ->sources() but limited to originals (i.e. not shadows/phantoms):
+sub original_sources {
+  my $self = shift;
+  my %s = map {$_=>1} values %{$self->_shadow_moniker_mappings->{originals}};
+  return keys %s;
+}
+
+# deploy only shadow sources
+sub deploy_shadows {
+  my ($self, $sqltargs, @args) = @_;
+  $sqltargs ||= {};
+  $sqltargs->{sources} = [$self->shadow_sources];
+  return $self->deploy($sqltargs, @args);
+}
+
+
 1;
 
 =head1 NAME

@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Address;
+package TestSchema::SakilaPlain::Result::Address;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("address");
 __PACKAGE__->add_columns(
   "address_id",
@@ -46,32 +45,32 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("address_id");
 __PACKAGE__->belongs_to(
   "city",
-  "TestSchema::Sakila::Result::City",
+  "TestSchema::SakilaPlain::Result::City",
   { city_id => "city_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 __PACKAGE__->has_many(
   "customers",
-  "TestSchema::Sakila::Result::Customer",
+  "TestSchema::SakilaPlain::Result::Customer",
   { "foreign.address_id" => "self.address_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->has_many(
   "staffs",
-  "TestSchema::Sakila::Result::Staff",
+  "TestSchema::SakilaPlain::Result::Staff",
   { "foreign.address_id" => "self.address_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->has_many(
   "stores",
-  "TestSchema::Sakila::Result::Store",
+  "TestSchema::SakilaPlain::Result::Store",
   { "foreign.address_id" => "self.address_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:prCz08DdJM/pBZ3JZ5vEyA
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:VTjABhYeXRYj2l2nQRA7rg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

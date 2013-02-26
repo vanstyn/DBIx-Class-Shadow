@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Payment;
+package TestSchema::SakilaPlain::Result::Payment;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("payment");
 __PACKAGE__->add_columns(
   "payment_id",
@@ -53,13 +52,13 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("payment_id");
 __PACKAGE__->belongs_to(
   "customer",
-  "TestSchema::Sakila::Result::Customer",
+  "TestSchema::SakilaPlain::Result::Customer",
   { customer_id => "customer_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 __PACKAGE__->belongs_to(
   "rental",
-  "TestSchema::Sakila::Result::Rental",
+  "TestSchema::SakilaPlain::Result::Rental",
   { rental_id => "rental_id" },
   {
     is_deferrable => 1,
@@ -70,14 +69,14 @@ __PACKAGE__->belongs_to(
 );
 __PACKAGE__->belongs_to(
   "staff",
-  "TestSchema::Sakila::Result::Staff",
+  "TestSchema::SakilaPlain::Result::Staff",
   { staff_id => "staff_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:U6vOpdV/eXaKWc55rtymOw
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:r8xBkB40tuHSiNe/Rn5uLg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

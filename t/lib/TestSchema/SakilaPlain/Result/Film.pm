@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Film;
+package TestSchema::SakilaPlain::Result::Film;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("film");
 __PACKAGE__->add_columns(
   "film_id",
@@ -92,31 +91,31 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("film_id");
 __PACKAGE__->has_many(
   "film_actors",
-  "TestSchema::Sakila::Result::FilmActor",
+  "TestSchema::SakilaPlain::Result::FilmActor",
   { "foreign.film_id" => "self.film_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->has_many(
   "film_categories",
-  "TestSchema::Sakila::Result::FilmCategory",
+  "TestSchema::SakilaPlain::Result::FilmCategory",
   { "foreign.film_id" => "self.film_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->has_many(
   "inventories",
-  "TestSchema::Sakila::Result::Inventory",
+  "TestSchema::SakilaPlain::Result::Inventory",
   { "foreign.film_id" => "self.film_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 __PACKAGE__->belongs_to(
   "language",
-  "TestSchema::Sakila::Result::Language",
+  "TestSchema::SakilaPlain::Result::Language",
   { language_id => "language_id" },
   { is_deferrable => 1, on_delete => "RESTRICT", on_update => "CASCADE" },
 );
 __PACKAGE__->belongs_to(
   "original_language",
-  "TestSchema::Sakila::Result::Language",
+  "TestSchema::SakilaPlain::Result::Language",
   { language_id => "original_language_id" },
   {
     is_deferrable => 1,
@@ -127,8 +126,8 @@ __PACKAGE__->belongs_to(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:jSUXO6iqoir76jluYyZ09w
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:csayxT+HSxUYruPuUaMsWA
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

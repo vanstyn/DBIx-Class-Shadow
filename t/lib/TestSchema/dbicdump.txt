@@ -13,10 +13,21 @@ dbicdump \
   
 
   
-dbicdump \
+PERLLIB="lib:t/lib" dbicdump \
   -o dump_directory=./t/lib  \
   -o debug=1 -o rescan=1 -o generate_pod=0 \
   -o schema_components='["Schema::Shadow"]' \
+  -o result_base_class='TestSchema::Sakila::BaseResult' \
   -o components='["Shadow"]' \
   TestSchema::Sakila \
   'dbi:mysql:sakila' root ''
+
+
+PERLLIB="lib:t/lib" dbicdump \
+  -o dump_directory=./t/lib  \
+  -o debug=1 -o rescan=1 -o generate_pod=0 \
+  -o result_base_class='TestSchema::Sakila::BaseResult' \
+  TestSchema::SakilaPlain \
+  'dbi:mysql:sakila' root ''
+
+

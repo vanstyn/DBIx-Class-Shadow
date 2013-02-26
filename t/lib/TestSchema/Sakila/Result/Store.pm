@@ -7,7 +7,7 @@ package TestSchema::Sakila::Result::Store;
 use strict;
 use warnings;
 
-use base 'DBIx::Class::Core';
+use base 'TestSchema::Sakila::BaseResult';
 __PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("store");
 __PACKAGE__->add_columns(
@@ -74,8 +74,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-25 15:05:21
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:RtpHiW9i/2cLrmEL8UZX8A
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:8gllzrIvIA4MSuKLgZXOdg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

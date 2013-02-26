@@ -1,5 +1,5 @@
 use utf8;
-package TestSchema::Sakila::Result::Country;
+package TestSchema::SakilaPlain::Result::Country;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
@@ -8,7 +8,6 @@ use strict;
 use warnings;
 
 use base 'TestSchema::Sakila::BaseResult';
-__PACKAGE__->load_components("Shadow");
 __PACKAGE__->table("country");
 __PACKAGE__->add_columns(
   "country_id",
@@ -31,14 +30,14 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("country_id");
 __PACKAGE__->has_many(
   "cities",
-  "TestSchema::Sakila::Result::City",
+  "TestSchema::SakilaPlain::Result::City",
   { "foreign.country_id" => "self.country_id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:43
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:5b7k4RLJqruyTqC6xaXU+w
+# Created by DBIx::Class::Schema::Loader v0.07033 @ 2013-02-26 11:28:18
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:FBB09wc6oAR5gdH+gwx6Zw
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
